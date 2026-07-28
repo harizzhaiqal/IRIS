@@ -324,6 +324,54 @@ export async function submitMonth(input: unknown): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * Reopens a month that was declared a nil return. Needed when a HOD sends one
+ * back: without this the employee cannot add the entries they were asked for.
+ */
+export async function withdrawNilReturn(input: unknown): Promise<ActionResult> {
+  const profile = await requireProfile();
+
+  const parsed = periodSchema.safeParse(input);
+  if (!parsed.success) return failed("Choose a valid month.");
+
+  const { month, year } = parsed.data;
+  const supabase = createClient();
+
+  const { data: submission } = await supabase
+    .from("training_submissions")
+    .select("id, status, is_nil_return")
+    .eq("employee_id", profile.id)
+    .eq("month", month)
+    .eq("year", year)
+    .maybeSingle();
+
+  if (!submission || !submission.is_nil_return) {
+    return failed("This month is not recorded as a nil return.");
+  }
+
+  if (!isEditableStatus(submission.status)) {
+    return failed("This month is with your reviewers and cannot be changed.");
+  }
+
+  const { error } = await supabase
+    .from("training_submissions")
+    .update({ is_nil_return: false })
+    .eq("id", submission.id);
+
+  if (error) return failed("Could not withdraw the nil return.");
+
+  await logAction({
+    actionType: "submission.nil_return_withdrawn",
+    description: `${profile.full_name} withdrew the nil return for ${monthName(month)} ${year}`,
+    relatedTable: "training_submissions",
+    relatedId: submission.id,
+    performedBy: profile.id,
+  });
+
+  revalidatePath("/training");
+  return { ok: true };
+}
+
 export async function declareNilReturn(input: unknown): Promise<ActionResult> {
   const profile = await requireProfile();
 

@@ -28,6 +28,7 @@ export async function listRecentActivity(
 export const ACTIVITY_LABELS: Record<string, string> = {
   "submission.submitted": "Submitted for verification",
   "submission.nil_return": "Nil return declared",
+  "submission.nil_return_withdrawn": "Nil return withdrawn",
   "submission.hod_verified": "Verified by HOD",
   "submission.returned": "Returned to employee",
   "submission.approved": "Approved by HR",

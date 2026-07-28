@@ -19,11 +19,13 @@ export function MonthActions({
   month,
   year,
   entryCount,
+  isNilReturn,
   entriesMissingAttachments,
 }: {
   month: number;
   year: number;
   entryCount: number;
+  isNilReturn: boolean;
   entriesMissingAttachments: string[];
 }) {
   const router = useRouter();
@@ -70,12 +72,15 @@ export function MonthActions({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => setConfirmOpen(true)} disabled={entryCount === 0}>
+        <Button
+          onClick={() => setConfirmOpen(true)}
+          disabled={entryCount === 0 && !isNilReturn}
+        >
           <Send className="h-4 w-4" />
-          Submit month
+          {isNilReturn ? "Submit nil return" : "Submit month"}
         </Button>
 
-        {entryCount === 0 ? (
+        {entryCount === 0 && !isNilReturn ? (
           <Button variant="outline" onClick={() => setNilOpen(true)}>
             <SlashSquare className="h-4 w-4" />
             Declare nil return

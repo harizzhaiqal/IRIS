@@ -45,3 +45,11 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **Two years of data: 2025 in full, 2026 through July.** A single year could not show both a complete annual compliance figure and a realistic in-flight current month. 2025 gives settled year-end totals; 2026 carries the live states — July holds drafts and both pending stages, June is past its 10 July deadline so unfinished months there read as overdue, and two people have not opened July at all.
 
 **Monthly volumes are generated from a per-person base with a deterministic variance**, ranging from roughly 135 to 330 minutes a month. This puts some employees comfortably past the 48-hour standard and others below the 36-hour threshold, so the compliance dashboard shows a real distribution rather than a flat line.
+
+## Workflow gaps found while building
+
+**A nil return can be withdrawn while the month is still editable.** The brief describes declaring a nil return but not undoing one. Without it, a HOD returning a nil return left the employee stuck: they could not add the entries they had just been asked for, and the error message pointed at an action that did not exist. `withdrawNilReturn` closes that loop, and the submit button accepts a nil return so a returned one can be resubmitted as-is.
+
+**A reviewer can never act on their own submission**, checked in the verification panel as well as the database. A HOD's own record is verified by the other HOD; HR's own record is verified by a HOD and then, unavoidably, approved by HR. That last step is a real segregation-of-duties gap in a single-HR-admin company and is flagged here rather than silently accepted — a second HR admin, or an explicit exception, is the fix.
+
+**Overdue on the HR dashboard is measured against the previous month**, not the current one. The current month's deadline is the 10th of the *next* month, so it is almost never overdue yet, and counting it would report zero forever.

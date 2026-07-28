@@ -495,6 +495,38 @@ console.log("\n=== Two-stage verification ===");
   });
 }
 
+console.log("\n=== Nil returns ===");
+{
+  const nil = await db.query(`
+    select s.id, s.employee_id from public.training_submissions s
+     where s.is_nil_return limit 1`);
+  const { id, employee_id } = nil.rows[0];
+
+  // Reopen it the way a returned nil return has to be reopened.
+  await db.query(
+    `update public.training_submissions set status = 'returned_by_hod' where id = $1`, [id]);
+
+  await asUser(employee_id, async () => {
+    const res = await db.query(
+      `update public.training_submissions set is_nil_return = false
+        where id = $1 returning is_nil_return`, [id]);
+    check("the owner can withdraw a nil return while the month is open",
+      res.rows[0]?.is_nil_return === false);
+
+    const added = await db.query(
+      `insert into public.training_records
+         (submission_id, seq_no, title, start_datetime, end_datetime, calculated_minutes, recorded_minutes)
+       values ($1, 60, 'Added after withdrawing', '2026-03-04 09:00+00', '2026-03-04 13:00+00', 240, 240)
+       returning id`, [id]);
+    check("entries can be added once the nil return is withdrawn", added.rows.length === 1);
+  });
+
+  await expectError("a nil return cannot hold entries", () =>
+    db.query(
+      `update public.training_submissions set is_nil_return = true where id = $1`, [id]),
+    "nil return cannot contain training entries");
+}
+
 console.log("\n=== Privilege escalation ===");
 {
   await asUser(STAFF_AIMAN, async () => {

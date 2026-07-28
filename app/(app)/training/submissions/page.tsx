@@ -75,7 +75,6 @@ export default async function SubmissionsPage({
     is_late: row.is_late,
     is_nil_return: row.is_nil_return,
     total_minutes: row.total_minutes,
-    submitted_at: row.submitted_at,
     employeeName: row.employee?.full_name ?? "Unknown employee",
     departmentName: row.employee?.department?.name ?? null,
   }));

@@ -29,7 +29,6 @@ export type SubmissionRow = {
   is_late: boolean;
   is_nil_return: boolean;
   total_minutes: number;
-  submitted_at: string | null;
   employeeName: string;
   departmentName: string | null;
 };

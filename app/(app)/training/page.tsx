@@ -31,6 +31,7 @@ import {
 import { EntryRowActions } from "./entry-row-actions";
 import { MonthActions } from "./month-actions";
 import { MonthPicker } from "./month-picker";
+import { WithdrawNilReturn } from "./withdraw-nil-return";
 
 export const metadata = { title: "My training — IRIS" };
 
@@ -221,6 +222,11 @@ export default async function TrainingPage({
               icon={CalendarOff}
               title="Recorded as a nil return"
               description={`You reported no training for ${monthName(month)} ${year}. HR can tell this apart from a month that has not been filled in.`}
+              action={
+                editable ? (
+                  <WithdrawNilReturn month={month} year={year} />
+                ) : undefined
+              }
             />
           ) : records.length === 0 ? (
             <EmptyState
@@ -270,6 +276,7 @@ export default async function TrainingPage({
                 month={month}
                 year={year}
                 entryCount={records.length}
+                isNilReturn={submission?.is_nil_return ?? false}
                 entriesMissingAttachments={entriesMissingAttachments}
               />
             </div>
