@@ -1,3 +1,6 @@
+import { HodDashboard } from "@/components/dashboard/hod-dashboard";
+import { HrDashboard } from "@/components/dashboard/hr-dashboard";
+import { StaffDashboard } from "@/components/dashboard/staff-dashboard";
 import { requireProfile } from "@/lib/auth";
 
 export const metadata = { title: "Dashboard — IRIS" };
@@ -5,14 +8,8 @@ export const metadata = { title: "Dashboard — IRIS" };
 export default async function DashboardPage() {
   const profile = await requireProfile();
 
-  return (
-    <div className="space-y-1">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Welcome back, {profile.full_name.split(" ")[0]}
-      </h1>
-      <p className="text-sm text-muted-foreground">
-        Your dashboard is assembled in a later step.
-      </p>
-    </div>
-  );
+  if (profile.role === "hr_admin") return <HrDashboard profile={profile} />;
+  if (profile.role === "hod") return <HodDashboard profile={profile} />;
+
+  return <StaffDashboard profile={profile} />;
 }
