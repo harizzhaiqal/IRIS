@@ -33,3 +33,15 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **Overrides require a reason at the database level.** A check constraint rejects any record whose `recorded_minutes` differs from `calculated_minutes` without an `override_reason`. The brief asks for the reason in the UI; making it a constraint means the reviewer is never shown an unexplained discrepancy.
 
 **Signup is disabled in `config.toml`.** HR creates staff accounts; there is no self-registration route in the brief.
+
+**SQL is verified with PGlite (`npm run test:sql`) instead of a local Supabase stack.** With no Docker available, the alternative was shipping unexecuted SQL. `supabase/tests/verify-sql.mjs` applies both migrations and the seed to a real Postgres compiled to WebAssembly, then asserts the trigger behaviour, the constraints, RLS isolation between employees, and the whole submit → return → resubmit → verify → approve lifecycle. It stubs the parts Supabase provides rather than these migrations — the `auth` and `storage` schemas, `auth.uid()`, and pgcrypto — and skips `CREATE EXTENSION`, so it validates the project's own SQL, not the platform's. It found two real defects: an uncast UUID literal in the seed, and confirmed that a HOD acting outside their team is filtered out by RLS rather than raising, which is the intended outcome.
+
+## Seed data
+
+**The two HODs are each other's HOD.** A HOD files their own monthly record as a staff member, and that record still needs a HOD verification stage before HR sees it. Pointing them at HR instead would not work: the verification trigger requires the HOD stage to be performed by someone with the `hod` role.
+
+**Support has no HOD of its own.** The brief specifies three departments but only two HODs, so Sharon heads both Sales and Support. Faizal heads Software Development.
+
+**Two years of data: 2025 in full, 2026 through July.** A single year could not show both a complete annual compliance figure and a realistic in-flight current month. 2025 gives settled year-end totals; 2026 carries the live states — July holds drafts and both pending stages, June is past its 10 July deadline so unfinished months there read as overdue, and two people have not opened July at all.
+
+**Monthly volumes are generated from a per-person base with a deterministic variance**, ranging from roughly 135 to 330 minutes a month. This puts some employees comfortably past the 48-hour standard and others below the 36-hour threshold, so the compliance dashboard shows a real distribution rather than a flat line.
