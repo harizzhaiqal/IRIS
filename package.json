@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:sql": "node supabase/tests/verify-sql.mjs",
-    "types:generate": "supabase gen types typescript --local > lib/supabase/database.types.ts"
+    "types:generate": "supabase gen types typescript --local > lib/supabase/database.types.ts",
+    "sql:bundle": "node scripts/bundle-sql.mjs",
+    "test:bundle": "node supabase/tests/verify-bundle.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",

@@ -53,3 +53,13 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **A reviewer can never act on their own submission**, checked in the verification panel as well as the database. A HOD's own record is verified by the other HOD; HR's own record is verified by a HOD and then, unavoidably, approved by HR. That last step is a real segregation-of-duties gap in a single-HR-admin company and is flagged here rather than silently accepted — a second HR admin, or an explicit exception, is the fix.
 
 **Overdue on the HR dashboard is measured against the previous month**, not the current one. The current month's deadline is the 10th of the *next* month, so it is almost never overdue yet, and counting it would report zero forever.
+
+## Setup path
+
+**Hosted Supabase is the documented default; the Docker stack is optional.** The local CLI stack boots roughly ten containers — Postgres, GoTrue, PostgREST, Storage, Realtime, Kong, Studio — because Supabase is a platform rather than a database, and IRIS depends on the auth, data-API, and storage layers, so plain Postgres would not substitute. Requiring Docker to see the app run is a heavy prerequisite for a demo machine that does not have it. The hosted free tier provides the same containers on Supabase's hardware, needs no install, and yields a deployable URL.
+
+**`supabase/setup.sql` bundles both migrations and the seed into a single paste.** Running three files in the right order through the SQL Editor is the step most likely to go wrong under demo pressure. `scripts/bundle-sql.mjs` concatenates them behind a header that drops and rebuilds the `public` schema, so the file is re-runnable and a botched run can simply be repeated. The migrations remain the source of truth; `setup.sql` is generated and marked as such.
+
+**The bundle header owns re-runnability, not the migrations.** Migrations stay conventional run-once DDL. The header additionally pins `uuid-ossp` and `pgcrypto` to the `extensions` schema so the `public` drop cannot take them, and clears the storage policies, which live in the `storage` schema and so survive that drop. Storage policies are dropped by name prefix in a `DO` block rather than listed individually, so adding one does not silently break the re-run.
+
+**`npm run test:bundle` applies `setup.sql` twice against PGlite.** Writing the file was not evidence it worked: the first run surfaced two real defects. Demo identities were being deleted by `provider_id`, which stores the user's uuid rather than their email, so the delete matched nothing and the follow-up delete of `auth.users` hit a foreign key. The storage policies then collided on recreation. Both were found only by executing it.

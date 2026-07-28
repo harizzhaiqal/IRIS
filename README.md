@@ -52,58 +52,89 @@ constraint, and reviewers are shown both numbers side by side.
 
 ## Local setup
 
-Requires Node 20+ and Docker (for the local Supabase stack).
+Requires Node 20+. Docker is **not** needed for the path below.
+
+IRIS needs a Supabase project because it uses Supabase for auth, the data API,
+and file storage — a bare Postgres install is not enough. The quickest way to get
+one is the hosted free tier.
 
 ```bash
 npm install
 ```
 
-Copy the environment template and fill it in:
+### 1. Create a Supabase project
+
+Sign in at [supabase.com/dashboard](https://supabase.com/dashboard) and create a
+project. Any region works; note the database password you choose.
+
+### 2. Load the schema and demo data
+
+Open the project's **SQL Editor**, paste the entire contents of
+[`supabase/setup.sql`](supabase/setup.sql), and run it. That one file creates the
+schema, the RLS policies, and the demo accounts with a full year of submissions.
+
+Re-running it is safe — it rebuilds from scratch, which also discards anything
+you have added since.
+
+### 3. Point the app at the project
 
 ```bash
 cp .env.example .env.local
 ```
 
-| Variable | Purpose |
-| --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase API URL. Safe in the browser. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key. Safe in the browser; RLS constrains it. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Bypasses RLS. **Server-side only — never prefix with `NEXT_PUBLIC_`.** |
+Fill in the three values from **Project Settings → API**:
 
-Start Supabase. This applies everything in `supabase/migrations/` and then runs
-`supabase/seed.sql`:
+| Variable | Where to find it | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL | Supabase API URL. Safe in the browser. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `anon` `public` key | Safe in the browser; RLS constrains it. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `service_role` `secret` key | Bypasses RLS. **Server-side only — never prefix with `NEXT_PUBLIC_`.** |
 
-```bash
-npx supabase start
-```
-
-The command prints the API URL, anon key, and service-role key — copy them into
-`.env.local`. Then:
+### 4. Run it
 
 ```bash
 npm run dev
 ```
 
-The app runs at http://localhost:3000 and Supabase Studio at
-http://localhost:54323.
+The app runs at http://localhost:3000. Sign in with any account from
+[Demo accounts](#demo-accounts) below.
 
-### Migrations and seeds
+### Optional: the local Supabase stack
+
+Only worth it if you want to develop offline or reset the database freely. It
+runs Postgres, GoTrue, PostgREST, Storage, Realtime, and Studio as containers, so
+it **does** require [Docker Desktop](https://www.docker.com/products/docker-desktop/):
+
+```bash
+npx supabase start
+```
+
+This applies `supabase/migrations/` and then `supabase/seed.sql` automatically,
+and prints the URL and keys to copy into `.env.local`. Studio is at
+http://localhost:54323. To wipe and reseed after changing a migration:
 
 ```bash
 npx supabase db reset
 ```
 
-Drops the local database, replays every migration in order, and reseeds. Use this
-whenever you change a migration.
+### Changing the schema
 
-To apply migrations to a hosted project:
+The migrations under `supabase/migrations/` are the source of truth;
+`supabase/setup.sql` is generated from them. After editing a migration or the
+seed, regenerate the bundle:
+
+```bash
+npm run sql:bundle
+```
+
+To push migrations to a hosted project with the CLI instead of the SQL Editor:
 
 ```bash
 npx supabase link --project-ref <your-project-ref>
-npx supabase db push
 ```
 
-After any schema change, regenerate the TypeScript types:
+Note that `db push` applies migrations but does not run the seed. After any
+schema change, regenerate the TypeScript types:
 
 ```bash
 npm run types:generate
@@ -137,15 +168,23 @@ the multi-day override case described above.
 ## Testing
 
 ```bash
-npm test        # unit tests for the duration and target maths
-npm run test:sql # migrations, seed, triggers, and RLS against a real Postgres
-npm run build   # type check and production build
+npm test            # unit tests for the duration and target maths
+npm run test:sql    # migrations, seed, triggers, and RLS against a real Postgres
+npm run test:bundle # supabase/setup.sql applies cleanly and is safe to re-run
+npm run build       # type check and production build
 ```
 
-`npm run test:sql` applies both migrations and the seed to Postgres compiled to
-WebAssembly (PGlite), then asserts the rules hold: the total-minutes trigger, the
-constraints, RLS isolation between employees, and the whole submit → return →
-resubmit → verify → approve lifecycle. It needs no Docker, so it runs anywhere.
+All of these run without Docker or a database, because `test:sql` and
+`test:bundle` use Postgres compiled to WebAssembly (PGlite). The pieces Supabase
+normally provides — the `auth` and `storage` schemas, `pgcrypto` — are stubbed.
+
+`test:sql` applies both migrations and the seed, then asserts the rules hold: the
+total-minutes trigger, the constraints, RLS isolation between employees, and the
+whole submit → return → resubmit → verify → approve lifecycle.
+
+`test:bundle` applies `supabase/setup.sql` twice, checking that the demo data
+lands correctly the first time and that a second run leaves identical row counts
+rather than duplicate accounts.
 
 ## Project layout
 
@@ -170,7 +209,10 @@ lib/
 supabase/
   migrations/            schema, RLS policies, workflow triggers
   seed.sql               demo data
+  setup.sql              generated: migrations + seed as one paste for hosted Supabase
   tests/verify-sql.mjs   SQL verification harness
+  tests/verify-bundle.mjs  checks setup.sql applies and re-applies cleanly
+scripts/bundle-sql.mjs   regenerates setup.sql — npm run sql:bundle
 ```
 
 Components never build Supabase queries inline; they call helpers in
