@@ -85,7 +85,21 @@ console.log("  stubs installed");
 
 // CREATE EXTENSION is unavailable in PGlite; the stubs above stand in for what
 // those two extensions would provide.
-const bundle = read("supabase/setup.sql").replace(/create extension[^;]*;/gi, "");
+const rawBundle = read("supabase/setup.sql");
+const bundle = rawBundle.replace(/create extension[^;]*;/gi, "");
+
+// Static guard, because execution here cannot catch this. PGlite runs the whole
+// bundle in one session, so a temporary table always resolves; the Supabase SQL
+// Editor does not promise one session across a script, where the same table
+// disappears mid-run. A real setup.sql failed this way after passing every
+// executed check below.
+console.log("\n=== Static checks ===");
+const tempTables = [...rawBundle.matchAll(/create\s+(temporary|temp)\s+table\s+(\w+)/gi)];
+check(
+  "no temporary tables — they do not survive the SQL Editor",
+  tempTables.length === 0,
+  tempTables.map((m) => m[2]).join(", "),
+);
 
 async function applyBundle(label) {
   console.log(`\n=== ${label} ===`);

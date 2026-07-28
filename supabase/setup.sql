@@ -982,16 +982,18 @@ select public.seed_account(
 -- comfortably above the 48h standard down to below the 36h threshold.
 -- ---------------------------------------------------------------------------
 
--- Not ON COMMIT DROP: psql autocommits each statement, which would discard the
--- table before the generator below could read it. Dropped explicitly at the end.
-create temporary table seed_people (
+-- A real table rather than a temporary one. Temp tables are session-scoped, and
+-- the Supabase SQL Editor does not guarantee a single session across a script,
+-- so a temp table can vanish before the generator below reads it. Dropped
+-- explicitly at the end of this file.
+create table public.seed_people (
   idx int,
   id uuid,
   base_minutes int,
   catalogue text
 );
 
-insert into seed_people (idx, id, base_minutes, catalogue) values
+insert into public.seed_people (idx, id, base_minutes, catalogue) values
   (0, '22222222-2222-2222-2222-222222222222', 300, 'lead'),
   (1, '33333333-3333-3333-3333-333333333333', 285, 'lead'),
   (2, '44444444-4444-4444-4444-444444444444', 330, 'engineering'),
@@ -1004,7 +1006,7 @@ insert into seed_people (idx, id, base_minutes, catalogue) values
   (9, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 135, 'support');
 
 -- HR records training of its own too.
-insert into seed_people (idx, id, base_minutes, catalogue) values
+insert into public.seed_people (idx, id, base_minutes, catalogue) values
   (10, '11111111-1111-1111-1111-111111111111', 225, 'lead');
 
 do $$
@@ -1032,7 +1034,7 @@ declare
   v_effectiveness public.training_effectiveness;
   v_variance int;
 begin
-  for person in select * from seed_people order by idx loop
+  for person in select * from public.seed_people order by idx loop
 
     select hod_id into v_hod from public.profiles where id = person.id;
 
@@ -1350,7 +1352,7 @@ from public.training_submissions s
 join public.profiles p on p.id = s.employee_id
 where s.status <> 'draft';
 
-drop table seed_people;
+drop table public.seed_people;
 
 drop function public.seed_account(
   uuid, text, text, text, public.user_role, uuid, uuid, date
