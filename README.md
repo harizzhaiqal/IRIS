@@ -82,13 +82,18 @@ you have added since.
 cp .env.example .env.local
 ```
 
-Fill in the three values from **Project Settings → API**:
+Fill in the three values from the dashboard:
 
 | Variable | Where to find it | Purpose |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Project URL | Supabase API URL. Safe in the browser. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `anon` `public` key | Safe in the browser; RLS constrains it. |
-| `SUPABASE_SERVICE_ROLE_KEY` | `service_role` `secret` key | Bypasses RLS. **Server-side only — never prefix with `NEXT_PUBLIC_`.** |
+| `NEXT_PUBLIC_SUPABASE_URL` | Settings → Data API → Project URL | Supabase API URL. Safe in the browser. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Settings → API Keys → publishable | Safe in the browser; RLS constrains it. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Settings → API Keys → secret | Bypasses RLS. **Server-side only — never prefix with `NEXT_PUBLIC_`.** |
+
+The variable names predate Supabase's rename of these keys. A publishable key
+(`sb_publishable_…`) is the former anon key and a secret key (`sb_secret_…`) is
+the former service-role key; both formats work unchanged, so the names stay as
+they are rather than churning every call site.
 
 ### 4. Run it
 
