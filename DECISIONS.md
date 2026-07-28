@@ -28,7 +28,7 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 
 **Profiles are readable by every signed-in user.** Verification trails and reviewer names need to resolve arbitrary profile ids, and a per-row rule for "profiles you might see the name of" ends up equivalent to open reads. Names, designations, and departments are internal directory data. All writes remain restricted, and a `guard_profile_privileged_fields` trigger stops a user editing their own role, department, reporting line, or active flag through the self-update policy.
 
-**Storage paths are `<employee_id>/<submission_id>/<filename>`.** Putting the owner's id in the first path segment lets the storage policies authorize on a prefix comparison, with no join back to the training tables.
+**Storage paths are `<employee_id>/<training_record_id>/<filename>`.** Putting the owner's id in the first path segment lets the storage policies authorize on a prefix comparison, with no join back to the training tables. Files are uploaded from the browser directly to Storage after the entry is saved, so the record id is known and file bytes never pass through a server action.
 
 **Overrides require a reason at the database level.** A check constraint rejects any record whose `recorded_minutes` differs from `calculated_minutes` without an `override_reason`. The brief asks for the reason in the UI; making it a constraint means the reviewer is never shown an unexplained discrepancy.
 

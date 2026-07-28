@@ -429,8 +429,8 @@ create trigger training_submissions_enforce_update_rules
 -- ---------------------------------------------------------------------------
 -- Storage: supporting documents for training entries.
 --
--- Paths are laid out as <employee_id>/<submission_id>/<filename> so the owner
--- check is a prefix comparison on the first path segment.
+-- Paths are laid out as <employee_id>/<training_record_id>/<filename> so the
+-- owner check is a prefix comparison on the first path segment.
 -- ---------------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public)
