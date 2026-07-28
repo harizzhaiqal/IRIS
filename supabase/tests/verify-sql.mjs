@@ -126,8 +126,11 @@ await db.exec(`
     select string_to_array($1, '/');
   $$;
 
+  -- The three roles Supabase provisions on every project.
+  create role anon;
   create role authenticated;
-  grant usage on schema public, storage to authenticated;
+  create role service_role;
+  grant usage on schema public, storage to anon, authenticated, service_role;
 `);
 console.log("  stubs installed");
 
@@ -140,14 +143,27 @@ await db.exec(stripExtensions(read("supabase/migrations/20260728090100_rls_polic
 console.log("  applied without error");
 
 // RLS is bypassed for the table owner, so force it for the test.
+//
+// Deliberately no GRANT here: the migration is expected to issue its own. It
+// once did not, relying on Supabase's schema default privileges, and a grant in
+// this block hid that for every test below.
 await db.exec(`
   alter table public.profiles force row level security;
   alter table public.training_submissions force row level security;
   alter table public.training_records force row level security;
   alter table public.training_attachments force row level security;
   alter table public.automation_logs force row level security;
-  grant select, insert, update, delete on all tables in schema public to authenticated;
 `);
+
+// Assert the migration granted table access, rather than assuming it.
+{
+  const { rows } = await db.query(`
+    select count(*)::int as n from information_schema.role_table_grants
+    where grantee = 'authenticated' and table_schema = 'public'
+      and privilege_type = 'SELECT'
+  `);
+  check("migration grants authenticated access to the tables", rows[0].n >= 5, `${rows[0].n} tables`);
+}
 
 console.log("\n=== Seed ===");
 await db.exec(stripExtensions(read("supabase/seed.sql")));

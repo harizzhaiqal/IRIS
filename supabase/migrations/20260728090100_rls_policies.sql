@@ -463,3 +463,30 @@ create policy training_attachments_storage_delete on storage.objects
     bucket_id = 'training-attachments'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ---------------------------------------------------------------------------
+-- Table privileges
+--
+-- Stated explicitly rather than inherited from Supabase's default privileges
+-- for the public schema. Those defaults are a property of the schema, so any
+-- workflow that drops and recreates it — supabase/setup.sql does exactly that
+-- to stay re-runnable — silently loses them, and every signed-in request then
+-- fails with "permission denied for table profiles".
+--
+-- This is the coarse layer: it decides which roles may touch a table at all.
+-- The policies above are the fine layer, deciding which rows. Both must pass.
+-- anon is granted nothing: every page in IRIS requires a session.
+-- ---------------------------------------------------------------------------
+
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
+-- service_role bypasses RLS, but still needs the privilege to reach the table.
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+
+-- Keeps tables added by later migrations working without repeating the above.
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
+alter default privileges in schema public
+  grant all on tables to service_role;

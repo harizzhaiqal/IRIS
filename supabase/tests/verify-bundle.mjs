@@ -155,6 +155,17 @@ const { rows: dupes } = await db.query(`
 `);
 check("no duplicate demo accounts after re-run", dupes.length === 0, JSON.stringify(dupes));
 
+// Recreating the public schema discards Supabase's default privileges for it,
+// so the migration must grant table access itself. Without this the app builds,
+// deploys, signs a user in, and then fails every query it makes.
+const { rows: grants } = await db.query(`
+  select count(distinct table_name)::int as n
+  from information_schema.role_table_grants
+  where grantee = 'authenticated' and table_schema = 'public'
+    and privilege_type = 'SELECT'
+`);
+check("authenticated keeps table grants after the schema rebuild", grants[0].n >= 5, `${grants[0].n} tables`);
+
 // The whole point of pinning extensions: they must survive the schema drop.
 const { rows: ext } = await db.query(`
   select count(*)::int as n from pg_proc p
