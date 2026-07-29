@@ -25,9 +25,9 @@ create type public.training_effectiveness as enum (
 );
 
 -- ---------------------------------------------------------------------------
--- Departments and profiles
+-- Departments and users
 --
--- departments.hod_id and profiles.department_id reference each other, so the
+-- departments.hod_id and users.department_id reference each other, so the
 -- FKs are added after both tables exist.
 -- ---------------------------------------------------------------------------
 
@@ -38,7 +38,7 @@ create table public.departments (
   created_time timestamptz not null default now()
 );
 
-create table public.profiles (
+create table public.users (
   id uuid primary key references auth.users (id) on delete cascade,
   full_name text not null,
   email text not null unique,
@@ -46,18 +46,18 @@ create table public.profiles (
   date_joined date,
   role public.user_role not null default 'staff',
   department_id uuid references public.departments (id) on delete set null,
-  hod_id uuid references public.profiles (id) on delete set null,
+  hod_id uuid references public.users (id) on delete set null,
   is_active boolean not null default true,
   created_time timestamptz not null default now()
 );
 
 alter table public.departments
   add constraint departments_hod_id_fkey
-  foreign key (hod_id) references public.profiles (id) on delete set null;
+  foreign key (hod_id) references public.users (id) on delete set null;
 
-create index profiles_department_id_idx on public.profiles (department_id);
-create index profiles_hod_id_idx on public.profiles (hod_id);
-create index profiles_role_idx on public.profiles (role);
+create index users_department_id_idx on public.users (department_id);
+create index users_hod_id_idx on public.users (hod_id);
+create index users_role_idx on public.users (role);
 
 -- ---------------------------------------------------------------------------
 -- Application settings
@@ -73,7 +73,7 @@ create table public.app_settings (
   yearly_threshold_hours integer not null default 36,
   submission_deadline_day integer not null default 10,
   reminder_enabled boolean not null default true,
-  updated_by uuid references public.profiles (id) on delete set null,
+  updated_by uuid references public.users (id) on delete set null,
   modified_time timestamptz not null default now(),
   constraint app_settings_single_row check (id),
   constraint app_settings_deadline_day_valid
@@ -88,17 +88,17 @@ insert into public.app_settings (id) values (true);
 
 create table public.training_submissions (
   id uuid primary key default uuid_generate_v4(),
-  employee_id uuid not null references public.profiles (id) on delete cascade,
+  employee_id uuid not null references public.users (id) on delete cascade,
   month integer not null check (month between 1 and 12),
   year integer not null check (year between 2000 and 2100),
   status public.submission_status not null default 'draft',
   is_nil_return boolean not null default false,
   submitted_at timestamptz,
   is_late boolean not null default false,
-  hod_verified_by uuid references public.profiles (id) on delete set null,
+  hod_verified_by uuid references public.users (id) on delete set null,
   hod_verified_at timestamptz,
   hod_comment text,
-  hr_verified_by uuid references public.profiles (id) on delete set null,
+  hr_verified_by uuid references public.users (id) on delete set null,
   hr_verified_at timestamptz,
   hr_comment text,
   total_minutes integer not null default 0,
@@ -183,7 +183,7 @@ create table public.automation_logs (
   -- text, not uuid: the log points at whichever table the action touched, and
   -- those no longer share a key type now that training_records uses a bigint.
   related_id text,
-  performed_by uuid references public.profiles (id) on delete set null,
+  performed_by uuid references public.users (id) on delete set null,
   is_system boolean not null default false,
   created_time timestamptz not null default now()
 );

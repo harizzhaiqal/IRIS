@@ -57,7 +57,7 @@ begin
   )
   on conflict do nothing;
 
-  insert into public.profiles (
+  insert into public.users (
     id, full_name, email, designation, date_joined,
     role, department_id, hod_id, is_active
   ) values (
@@ -105,11 +105,11 @@ select public.seed_account(
 
 -- Each HOD verifies the other's own submissions, so a HOD's personal record
 -- still passes a HOD stage before it reaches HR.
-update public.profiles
+update public.users
    set hod_id = '33333333-3333-3333-3333-333333333333'
  where id = '22222222-2222-2222-2222-222222222222';
 
-update public.profiles
+update public.users
    set hod_id = '22222222-2222-2222-2222-222222222222'
  where id = '33333333-3333-3333-3333-333333333333';
 
@@ -244,7 +244,7 @@ declare
 begin
   for person in select * from public.seed_people order by idx loop
 
-    select hod_id into v_hod from public.profiles where id = person.id;
+    select hod_id into v_hod from public.users where id = person.id;
 
     v_titles := case person.catalogue
       when 'engineering' then array[
@@ -557,7 +557,7 @@ select
   false,
   coalesce(s.hr_verified_at, s.hod_verified_at, s.submitted_at, s.created_time)
 from public.training_submissions s
-join public.profiles p on p.id = s.employee_id
+join public.users p on p.id = s.employee_id
 where s.status <> 'draft';
 
 drop table public.seed_people;

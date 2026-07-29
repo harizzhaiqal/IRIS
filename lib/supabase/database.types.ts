@@ -45,7 +45,7 @@ export type Database = {
             foreignKeyName: "app_settings_updated_by_fkey";
             columns: ["updated_by"];
             isOneToOne: false;
-            referencedRelation: "profiles";
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];
@@ -86,7 +86,7 @@ export type Database = {
             foreignKeyName: "automation_logs_performed_by_fkey";
             columns: ["performed_by"];
             isOneToOne: false;
-            referencedRelation: "profiles";
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];
@@ -115,12 +115,12 @@ export type Database = {
             foreignKeyName: "departments_hod_id_fkey";
             columns: ["hod_id"];
             isOneToOne: false;
-            referencedRelation: "profiles";
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];
       };
-      profiles: {
+      users: {
         Row: {
           id: string;
           full_name: string;
@@ -159,21 +159,21 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "profiles_department_id_fkey";
+            foreignKeyName: "users_department_id_fkey";
             columns: ["department_id"];
             isOneToOne: false;
             referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "profiles_hod_id_fkey";
+            foreignKeyName: "users_hod_id_fkey";
             columns: ["hod_id"];
             isOneToOne: false;
-            referencedRelation: "profiles";
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "profiles_id_fkey";
+            foreignKeyName: "users_id_fkey";
             columns: ["id"];
             isOneToOne: true;
             referencedRelation: "users";
@@ -347,21 +347,21 @@ export type Database = {
             foreignKeyName: "training_submissions_employee_id_fkey";
             columns: ["employee_id"];
             isOneToOne: false;
-            referencedRelation: "profiles";
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
           {
             foreignKeyName: "training_submissions_hod_verified_by_fkey";
             columns: ["hod_verified_by"];
             isOneToOne: false;
-            referencedRelation: "profiles";
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
           {
             foreignKeyName: "training_submissions_hr_verified_by_fkey";
             columns: ["hr_verified_by"];
             isOneToOne: false;
-            referencedRelation: "profiles";
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];

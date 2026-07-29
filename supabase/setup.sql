@@ -81,9 +81,9 @@ create type public.training_effectiveness as enum (
 );
 
 -- ---------------------------------------------------------------------------
--- Departments and profiles
+-- Departments and users
 --
--- departments.hod_id and profiles.department_id reference each other, so the
+-- departments.hod_id and users.department_id reference each other, so the
 -- FKs are added after both tables exist.
 -- ---------------------------------------------------------------------------
 
@@ -94,7 +94,7 @@ create table public.departments (
   created_time timestamptz not null default now()
 );
 
-create table public.profiles (
+create table public.users (
   id uuid primary key references auth.users (id) on delete cascade,
   full_name text not null,
   email text not null unique,
@@ -102,18 +102,18 @@ create table public.profiles (
   date_joined date,
   role public.user_role not null default 'staff',
   department_id uuid references public.departments (id) on delete set null,
-  hod_id uuid references public.profiles (id) on delete set null,
+  hod_id uuid references public.users (id) on delete set null,
   is_active boolean not null default true,
   created_time timestamptz not null default now()
 );
 
 alter table public.departments
   add constraint departments_hod_id_fkey
-  foreign key (hod_id) references public.profiles (id) on delete set null;
+  foreign key (hod_id) references public.users (id) on delete set null;
 
-create index profiles_department_id_idx on public.profiles (department_id);
-create index profiles_hod_id_idx on public.profiles (hod_id);
-create index profiles_role_idx on public.profiles (role);
+create index users_department_id_idx on public.users (department_id);
+create index users_hod_id_idx on public.users (hod_id);
+create index users_role_idx on public.users (role);
 
 -- ---------------------------------------------------------------------------
 -- Application settings
@@ -129,7 +129,7 @@ create table public.app_settings (
   yearly_threshold_hours integer not null default 36,
   submission_deadline_day integer not null default 10,
   reminder_enabled boolean not null default true,
-  updated_by uuid references public.profiles (id) on delete set null,
+  updated_by uuid references public.users (id) on delete set null,
   modified_time timestamptz not null default now(),
   constraint app_settings_single_row check (id),
   constraint app_settings_deadline_day_valid
@@ -144,17 +144,17 @@ insert into public.app_settings (id) values (true);
 
 create table public.training_submissions (
   id uuid primary key default uuid_generate_v4(),
-  employee_id uuid not null references public.profiles (id) on delete cascade,
+  employee_id uuid not null references public.users (id) on delete cascade,
   month integer not null check (month between 1 and 12),
   year integer not null check (year between 2000 and 2100),
   status public.submission_status not null default 'draft',
   is_nil_return boolean not null default false,
   submitted_at timestamptz,
   is_late boolean not null default false,
-  hod_verified_by uuid references public.profiles (id) on delete set null,
+  hod_verified_by uuid references public.users (id) on delete set null,
   hod_verified_at timestamptz,
   hod_comment text,
-  hr_verified_by uuid references public.profiles (id) on delete set null,
+  hr_verified_by uuid references public.users (id) on delete set null,
   hr_verified_at timestamptz,
   hr_comment text,
   total_minutes integer not null default 0,
@@ -239,7 +239,7 @@ create table public.automation_logs (
   -- text, not uuid: the log points at whichever table the action touched, and
   -- those no longer share a key type now that training_records uses a bigint.
   related_id text,
-  performed_by uuid references public.profiles (id) on delete set null,
+  performed_by uuid references public.users (id) on delete set null,
   is_system boolean not null default false,
   created_time timestamptz not null default now()
 );
@@ -329,9 +329,9 @@ create trigger training_submissions_nil_return_guard
 -- ---------------------------------------------------------------------------
 -- Helper functions
 --
--- These are `security definer` so that a policy on `profiles` can read the
--- caller's role without re-entering `profiles` policies. Selecting from
--- profiles inside a profiles policy recurses and takes the whole table down.
+-- These are `security definer` so that a policy on `users` can read the
+-- caller's role without re-entering `users` policies. Selecting from
+-- users inside a users policy recurses and takes the whole table down.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.current_user_role()
@@ -341,7 +341,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select role from public.profiles where id = auth.uid();
+  select role from public.users where id = auth.uid();
 $$;
 
 create or replace function public.is_hr_admin()
@@ -363,7 +363,7 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.profiles
+    select 1 from public.users
      where id = employee and hod_id = auth.uid()
   );
 $$;
@@ -421,7 +421,7 @@ grant execute on function public.can_edit_submission(uuid) to authenticated;
 -- Enable RLS everywhere.
 -- ---------------------------------------------------------------------------
 
-alter table public.profiles enable row level security;
+alter table public.users enable row level security;
 alter table public.departments enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.training_submissions enable row level security;
@@ -430,31 +430,31 @@ alter table public.training_attachments enable row level security;
 alter table public.automation_logs enable row level security;
 
 -- ---------------------------------------------------------------------------
--- profiles
+-- users
 -- ---------------------------------------------------------------------------
 
 -- Staff names, designations, and departments act as an internal directory:
 -- every signed-in user needs them to render HOD names in verification trails
 -- and reviewer names on submissions. Reads are open; writes are not.
-create policy profiles_select_authenticated on public.profiles
+create policy users_select_authenticated on public.users
   for select to authenticated
   using (true);
 
 -- A user may maintain their own profile. Role and reporting line are locked
--- down separately by the profiles_guard_privileged_fields trigger.
-create policy profiles_update_own on public.profiles
+-- down separately by the users_guard_privileged_fields trigger.
+create policy users_update_own on public.users
   for update to authenticated
   using (id = auth.uid())
   with check (id = auth.uid());
 
 -- Only HR administers the staff list.
-create policy profiles_all_hr_admin on public.profiles
+create policy users_all_hr_admin on public.users
   for all to authenticated
   using (public.is_hr_admin())
   with check (public.is_hr_admin());
 
 -- Stops a user escalating their own role or reassigning their reporting line
--- through the profiles_update_own policy.
+-- through the users_update_own policy.
 create or replace function public.guard_profile_privileged_fields()
 returns trigger
 language plpgsql
@@ -477,8 +477,8 @@ begin
 end;
 $$;
 
-create trigger profiles_guard_privileged_fields
-  before update on public.profiles
+create trigger users_guard_privileged_fields
+  before update on public.users
   for each row execute function public.guard_profile_privileged_fields();
 
 -- ---------------------------------------------------------------------------
@@ -797,7 +797,7 @@ create policy training_attachments_storage_delete on storage.objects
 -- for the public schema. Those defaults are a property of the schema, so any
 -- workflow that drops and recreates it — supabase/setup.sql does exactly that
 -- to stay re-runnable — silently loses them, and every signed-in request then
--- fails with "permission denied for table profiles".
+-- fails with "permission denied for table users".
 --
 -- This is the coarse layer: it decides which roles may touch a table at all.
 -- The policies above are the fine layer, deciding which rows. Both must pass.
@@ -881,7 +881,7 @@ begin
   )
   on conflict do nothing;
 
-  insert into public.profiles (
+  insert into public.users (
     id, full_name, email, designation, date_joined,
     role, department_id, hod_id, is_active
   ) values (
@@ -929,11 +929,11 @@ select public.seed_account(
 
 -- Each HOD verifies the other's own submissions, so a HOD's personal record
 -- still passes a HOD stage before it reaches HR.
-update public.profiles
+update public.users
    set hod_id = '33333333-3333-3333-3333-333333333333'
  where id = '22222222-2222-2222-2222-222222222222';
 
-update public.profiles
+update public.users
    set hod_id = '22222222-2222-2222-2222-222222222222'
  where id = '33333333-3333-3333-3333-333333333333';
 
@@ -1068,7 +1068,7 @@ declare
 begin
   for person in select * from public.seed_people order by idx loop
 
-    select hod_id into v_hod from public.profiles where id = person.id;
+    select hod_id into v_hod from public.users where id = person.id;
 
     v_titles := case person.catalogue
       when 'engineering' then array[
@@ -1381,7 +1381,7 @@ select
   false,
   coalesce(s.hr_verified_at, s.hod_verified_at, s.submitted_at, s.created_time)
 from public.training_submissions s
-join public.profiles p on p.id = s.employee_id
+join public.users p on p.id = s.employee_id
 where s.status <> 'draft';
 
 drop table public.seed_people;

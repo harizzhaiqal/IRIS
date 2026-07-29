@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { listTeamMembers } from "@/lib/queries/profiles";
+import { listTeamMembers } from "@/lib/queries/users";
 import { getTargets } from "@/lib/queries/settings";
 import {
   listTeamSubmissionsForMonth,

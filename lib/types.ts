@@ -4,7 +4,7 @@ export type UserRole = Enums<"user_role">;
 export type SubmissionStatus = Enums<"submission_status">;
 export type Effectiveness = Enums<"training_effectiveness">;
 
-export type Profile = Tables<"profiles">;
+export type Profile = Tables<"users">;
 export type Department = Tables<"departments">;
 export type AppSettings = Tables<"app_settings">;
 export type TrainingSubmission = Tables<"training_submissions">;

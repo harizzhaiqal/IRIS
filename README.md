@@ -237,8 +237,13 @@ and staff, HODs, and HR all authenticate as the same database role:
   rules hold even if a client bypasses the UI.
 
 Role lookups go through `security definer` helper functions so that policies on
-`profiles` never select from `profiles` — that recursion is the usual way
-Supabase projects break.
+`users` never select from `users` — that recursion is the usual way Supabase
+projects break.
+
+`public.users` holds the staff directory: name, designation, role, department
+and reporting line. It is distinct from `auth.users`, the Supabase Auth table
+that owns credentials. The two share a primary key, and `public.users.id`
+references `auth.users(id)`. No password is stored in `public.users`.
 
 `total_minutes` is recomputed by the database on every write and cannot be forged
 from a client. The service-role key is used only in `lib/automationLog.ts` and

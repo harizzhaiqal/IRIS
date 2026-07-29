@@ -3,9 +3,9 @@
 -- ---------------------------------------------------------------------------
 -- Helper functions
 --
--- These are `security definer` so that a policy on `profiles` can read the
--- caller's role without re-entering `profiles` policies. Selecting from
--- profiles inside a profiles policy recurses and takes the whole table down.
+-- These are `security definer` so that a policy on `users` can read the
+-- caller's role without re-entering `users` policies. Selecting from
+-- users inside a users policy recurses and takes the whole table down.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.current_user_role()
@@ -15,7 +15,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select role from public.profiles where id = auth.uid();
+  select role from public.users where id = auth.uid();
 $$;
 
 create or replace function public.is_hr_admin()
@@ -37,7 +37,7 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.profiles
+    select 1 from public.users
      where id = employee and hod_id = auth.uid()
   );
 $$;
@@ -95,7 +95,7 @@ grant execute on function public.can_edit_submission(uuid) to authenticated;
 -- Enable RLS everywhere.
 -- ---------------------------------------------------------------------------
 
-alter table public.profiles enable row level security;
+alter table public.users enable row level security;
 alter table public.departments enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.training_submissions enable row level security;
@@ -104,31 +104,31 @@ alter table public.training_attachments enable row level security;
 alter table public.automation_logs enable row level security;
 
 -- ---------------------------------------------------------------------------
--- profiles
+-- users
 -- ---------------------------------------------------------------------------
 
 -- Staff names, designations, and departments act as an internal directory:
 -- every signed-in user needs them to render HOD names in verification trails
 -- and reviewer names on submissions. Reads are open; writes are not.
-create policy profiles_select_authenticated on public.profiles
+create policy users_select_authenticated on public.users
   for select to authenticated
   using (true);
 
 -- A user may maintain their own profile. Role and reporting line are locked
--- down separately by the profiles_guard_privileged_fields trigger.
-create policy profiles_update_own on public.profiles
+-- down separately by the users_guard_privileged_fields trigger.
+create policy users_update_own on public.users
   for update to authenticated
   using (id = auth.uid())
   with check (id = auth.uid());
 
 -- Only HR administers the staff list.
-create policy profiles_all_hr_admin on public.profiles
+create policy users_all_hr_admin on public.users
   for all to authenticated
   using (public.is_hr_admin())
   with check (public.is_hr_admin());
 
 -- Stops a user escalating their own role or reassigning their reporting line
--- through the profiles_update_own policy.
+-- through the users_update_own policy.
 create or replace function public.guard_profile_privileged_fields()
 returns trigger
 language plpgsql
@@ -151,8 +151,8 @@ begin
 end;
 $$;
 
-create trigger profiles_guard_privileged_fields
-  before update on public.profiles
+create trigger users_guard_privileged_fields
+  before update on public.users
   for each row execute function public.guard_profile_privileged_fields();
 
 -- ---------------------------------------------------------------------------
@@ -471,7 +471,7 @@ create policy training_attachments_storage_delete on storage.objects
 -- for the public schema. Those defaults are a property of the schema, so any
 -- workflow that drops and recreates it — supabase/setup.sql does exactly that
 -- to stay re-runnable — silently loses them, and every signed-in request then
--- fails with "permission denied for table profiles".
+-- fails with "permission denied for table users".
 --
 -- This is the coarse layer: it decides which roles may touch a table at all.
 -- The policies above are the fine layer, deciding which rows. Both must pass.

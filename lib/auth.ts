@@ -14,7 +14,7 @@ export async function getSessionProfile(): Promise<Profile | null> {
   if (!user) return null;
 
   const { data } = await supabase
-    .from("profiles")
+    .from("users")
     .select("*")
     .eq("id", user.id)
     .maybeSingle();

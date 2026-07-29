@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
-import { listTeamMembers } from "@/lib/queries/profiles";
+import { listTeamMembers } from "@/lib/queries/users";
 import { getTargets } from "@/lib/queries/settings";
 import { listTeamSubmissionsForMonth } from "@/lib/queries/submissions";
 import { minutesToHHMM } from "@/lib/utils/duration";

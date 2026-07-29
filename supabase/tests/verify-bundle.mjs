@@ -117,7 +117,7 @@ async function applyBundle(label) {
 
   const counts = {};
   for (const table of [
-    "profiles",
+    "users",
     "departments",
     "training_submissions",
     "training_records",
@@ -134,7 +134,7 @@ async function applyBundle(label) {
 
 const first = await applyBundle("First run (fresh database)");
 
-check("11 profiles seeded", first.profiles === 11, `got ${first.profiles}`);
+check("11 users seeded", first.users === 11, `got ${first.users}`);
 check("3 departments seeded", first.departments === 3, `got ${first.departments}`);
 check("submissions seeded", first.training_submissions > 50, `got ${first.training_submissions}`);
 check("training entries seeded", first.training_records > 100, `got ${first.training_records}`);

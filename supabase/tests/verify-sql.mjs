@@ -148,7 +148,7 @@ console.log("  applied without error");
 // once did not, relying on Supabase's schema default privileges, and a grant in
 // this block hid that for every test below.
 await db.exec(`
-  alter table public.profiles force row level security;
+  alter table public.users force row level security;
   alter table public.training_submissions force row level security;
   alter table public.training_records force row level security;
   alter table public.training_attachments force row level security;
@@ -172,7 +172,7 @@ console.log("  applied without error");
 console.log("\n=== Seed shape ===");
 {
   const roles = await db.query(
-    `select role, count(*)::int as n from public.profiles group by role order by role`,
+    `select role, count(*)::int as n from public.users group by role order by role`,
   );
   const byRole = Object.fromEntries(roles.rows.map((r) => [r.role, r.n]));
   check("1 hr_admin, 2 hods, 8 staff", byRole.hr_admin === 1 && byRole.hod === 2 && byRole.staff === 8,
@@ -547,15 +547,15 @@ console.log("\n=== Privilege escalation ===");
 {
   await asUser(STAFF_AIMAN, async () => {
     await expectError("staff cannot promote themselves", () =>
-      db.query(`update public.profiles set role = 'hr_admin' where id = $1`, [STAFF_AIMAN]),
+      db.query(`update public.users set role = 'hr_admin' where id = $1`, [STAFF_AIMAN]),
       "only hr can change role");
 
     await expectError("staff cannot reassign their reporting line", () =>
-      db.query(`update public.profiles set hod_id = null where id = $1`, [STAFF_AIMAN]),
+      db.query(`update public.users set hod_id = null where id = $1`, [STAFF_AIMAN]),
       "only hr can change role");
 
     const res = await db.query(
-      `update public.profiles set designation = 'Principal Engineer' where id = $1 returning designation`,
+      `update public.users set designation = 'Principal Engineer' where id = $1 returning designation`,
       [STAFF_AIMAN]);
     check("staff may still edit their own designation", res.rows[0]?.designation === "Principal Engineer");
   });

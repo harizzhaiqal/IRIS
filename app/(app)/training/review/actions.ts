@@ -56,7 +56,7 @@ export async function reviewSubmission(input: unknown): Promise<Result> {
 
   const { data: submission } = await supabase
     .from("training_submissions")
-    .select("id, status, month, year, employee:profiles!training_submissions_employee_id_fkey ( full_name )")
+    .select("id, status, month, year, employee:users!training_submissions_employee_id_fkey ( full_name )")
     .eq("id", submissionId)
     .maybeSingle();
 

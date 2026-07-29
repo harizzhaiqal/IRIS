@@ -36,7 +36,7 @@ export type SubmissionListItem = TrainingSubmission & {
 
 const LIST_SELECT = `
   *,
-  employee:profiles!training_submissions_employee_id_fkey (
+  employee:users!training_submissions_employee_id_fkey (
     id, full_name, designation,
     department:departments ( id, name )
   )
@@ -44,12 +44,12 @@ const LIST_SELECT = `
 
 const DETAIL_SELECT = `
   *,
-  employee:profiles!training_submissions_employee_id_fkey (
+  employee:users!training_submissions_employee_id_fkey (
     id, full_name, email, designation, date_joined, hod_id,
     department:departments ( id, name )
   ),
-  hod_verifier:profiles!training_submissions_hod_verified_by_fkey ( id, full_name ),
-  hr_verifier:profiles!training_submissions_hr_verified_by_fkey ( id, full_name ),
+  hod_verifier:users!training_submissions_hod_verified_by_fkey ( id, full_name ),
+  hr_verifier:users!training_submissions_hr_verified_by_fkey ( id, full_name ),
   records:training_records (
     *,
     attachments:training_attachments ( * )
@@ -182,7 +182,7 @@ export async function listSubmissions(
   let departmentEmployeeIds: string[] | null = null;
   if (filters.departmentId) {
     const { data: members } = await supabase
-      .from("profiles")
+      .from("users")
       .select("id")
       .eq("department_id", filters.departmentId);
 
