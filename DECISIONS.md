@@ -71,3 +71,13 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **Table privileges are granted explicitly by the RLS migration.** The schema originally relied on Supabase's `ALTER DEFAULT PRIVILEGES` for the `public` schema, which is invisible until something removes it — and `supabase/setup.sql` removes it every run, because dropping and recreating the schema is how the file stays re-runnable. The result would have been an app that builds, deploys, authenticates a user, and then fails every query with `permission denied for table profiles`. Grants are now stated in the migration: `authenticated` gets DML on all tables with RLS deciding rows, `service_role` gets everything, `anon` gets nothing, and default privileges are re-established for tables added later.
 
 **The SQL harness no longer grants privileges on the migration's behalf.** `verify-sql.mjs` had `grant select, insert, update, delete ... to authenticated` in its setup block, which meant all 45 assertions ran against permissions the harness supplied rather than the ones the migration issued. Removing that line is what exposed the gap; the harness now asserts the grants exist instead. Test scaffolding that quietly supplies what production is missing is worse than no test, because it reports confidence it has not earned.
+
+## Theme
+
+**Dark turquoise on white, with hue 185 carried through the neutrals.** Borders, muted text and secondary surfaces are desaturated turquoise rather than grey, so the interface reads as one palette instead of a grey app with teal buttons. All colour lives in the CSS variables in `app/globals.css`; no component names a Tailwind palette colour, so the brand can change in one file.
+
+**Status colours stay off the brand hue.** Approved, late and rejected are read on badges no wider than a word, so success sits at 145 and warning at 40 to remain unmistakably green and amber beside turquoise. Harmonising them toward the brand would have cost the glance-value the compliance views depend on.
+
+**The warning badge is the one element carrying dark text.** White on amber reaches 4.17:1, below AA, and the amber dark enough to carry white text reads brown rather than as a warning. Dark text on a true amber keeps the meaning and measures 8.19:1. The inconsistency with the other badges is deliberate and is the standard resolution for amber.
+
+**Contrast was measured in the browser, not estimated.** Every foreground/background pair was computed from resolved `rgb()` values on the running page: body text 16.3:1, muted text 5.6:1, primary button 6.3:1, success 5.1:1, warning 8.2:1, destructive 5.8:1. The warning failure was found this way rather than by eye.

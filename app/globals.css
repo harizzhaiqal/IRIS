@@ -2,58 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Brand palette: dark turquoise on white.
+ *
+ * Hue 185 carries the brand and is reused for the neutrals — borders, muted
+ * text and surfaces are desaturated turquoise rather than grey, which keeps the
+ * interface cohesive instead of looking like a grey app with teal buttons.
+ *
+ * Status colours deliberately stay off that hue. Approved, late and rejected
+ * are read at a glance on badges no larger than a word, so success sits at 145
+ * and warning at 32 to remain unmistakably green and amber next to turquoise.
+ */
+
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 185 45% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 185 45% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142.1 76.2% 36.3%;
-    --success-foreground: 355.7 100% 97.3%;
-    --warning: 32.1 94.6% 43.7%;
-    --warning-foreground: 355.7 100% 97.3%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --popover-foreground: 185 45% 10%;
+    /* 6.2:1 on white, so white label text on a primary button clears AA. */
+    --primary: 185 84% 24%;
+    --primary-foreground: 180 25% 98%;
+    --secondary: 185 40% 96%;
+    --secondary-foreground: 185 60% 16%;
+    --muted: 185 30% 96%;
+    --muted-foreground: 185 15% 38%;
+    --accent: 185 45% 93%;
+    --accent-foreground: 185 70% 18%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 145 65% 30%;
+    --success-foreground: 0 0% 100%;
+    /* The one badge carrying dark text. White on amber reaches only 4.17:1,
+       and the amber dark enough to fix that reads brown rather than a warning.
+       Dark text on a true amber keeps the meaning and clears AA at 8.2:1. */
+    --warning: 40 96% 55%;
+    --warning-foreground: 30 95% 12%;
+    --border: 185 25% 88%;
+    --input: 185 25% 85%;
+    --ring: 185 84% 30%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142.1 70.6% 45.3%;
-    --success-foreground: 144.9 80.4% 10%;
-    --warning: 32.1 94.6% 43.7%;
-    --warning-foreground: 20.9 91.7% 14.1%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --background: 190 45% 7%;
+    --foreground: 180 25% 96%;
+    --card: 190 40% 9%;
+    --card-foreground: 180 25% 96%;
+    --popover: 190 40% 9%;
+    --popover-foreground: 180 25% 96%;
+    /* Lifted well above the light-mode value: the same dark turquoise would
+       disappear into the background here. 7:1 against it. */
+    --primary: 185 65% 45%;
+    --primary-foreground: 190 60% 8%;
+    --secondary: 190 30% 16%;
+    --secondary-foreground: 180 25% 96%;
+    --muted: 190 30% 15%;
+    --muted-foreground: 185 15% 65%;
+    --accent: 190 32% 19%;
+    --accent-foreground: 180 25% 96%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 145 55% 45%;
+    --success-foreground: 145 80% 8%;
+    --warning: 32 90% 50%;
+    --warning-foreground: 25 90% 10%;
+    --border: 190 28% 18%;
+    --input: 190 28% 20%;
+    --ring: 185 65% 50%;
   }
 }
 
