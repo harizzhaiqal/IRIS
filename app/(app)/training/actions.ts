@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { logAction } from "@/lib/automationLog";
 import { createClient } from "@/lib/supabase/server";
-import { isEditableStatus } from "@/lib/types";
+import { isEditableStatus, type SubmissionStatus } from "@/lib/types";
 import { calculateMinutes } from "@/lib/utils/duration";
 import { getTargets } from "@/lib/queries/settings";
 import { isLateSubmission, monthName } from "@/lib/utils/targets";
@@ -27,14 +27,20 @@ function failed(error: string): { ok: false; error: string } {
  * The employee's row for a month, creating the draft on first use. Returns null
  * if the month exists but is closed to editing.
  */
-async function openSubmissionForEditing(
+type OpenableRow = {
+  id: string;
+  status: SubmissionStatus;
+  is_nil_return: boolean;
+};
+
+/** Reads the month, keeping the Postgres error rather than discarding it. */
+async function findSubmission(
+  supabase: ReturnType<typeof createClient>,
   employeeId: string,
   month: number,
   year: number,
-): Promise<{ id: string } | { error: string }> {
-  const supabase = createClient();
-
-  const { data: existing } = await supabase
+): Promise<{ row: OpenableRow | null } | { error: string }> {
+  const { data, error } = await supabase
     .from("training_submissions")
     .select("id, status, is_nil_return")
     .eq("employee_id", employeeId)
@@ -42,18 +48,34 @@ async function openSubmissionForEditing(
     .eq("year", year)
     .maybeSingle();
 
-  if (existing) {
-    if (!isEditableStatus(existing.status)) {
-      return { error: "This month has been submitted and cannot be edited." };
-    }
-    if (existing.is_nil_return) {
-      return {
-        error:
-          "This month is recorded as a nil return. Withdraw the nil return before adding training.",
-      };
-    }
-    return { id: existing.id };
+  if (error) return { error: `Could not read this month: ${error.message}` };
+  return { row: (data as OpenableRow | null) ?? null };
+}
+
+/** Turns a found row into an id, or explains why the month is closed. */
+function resolveExisting(row: OpenableRow): { id: string } | { error: string } {
+  if (!isEditableStatus(row.status)) {
+    return { error: "This month has been submitted and cannot be edited." };
   }
+  if (row.is_nil_return) {
+    return {
+      error:
+        "This month is recorded as a nil return. Withdraw the nil return before adding training.",
+    };
+  }
+  return { id: row.id };
+}
+
+async function openSubmissionForEditing(
+  employeeId: string,
+  month: number,
+  year: number,
+): Promise<{ id: string } | { error: string }> {
+  const supabase = createClient();
+
+  const found = await findSubmission(supabase, employeeId, month, year);
+  if ("error" in found) return found;
+  if (found.row) return resolveExisting(found.row);
 
   const { data: created, error } = await supabase
     .from("training_submissions")
@@ -61,11 +83,26 @@ async function openSubmissionForEditing(
     .select("id")
     .single();
 
-  if (error || !created) {
-    return { error: "Could not open this month for editing." };
+  if (created) return { id: created.id };
+
+  // 23505 means the row exists after all — either another tab opened the month
+  // between the read and the insert, or the read could not see a row that the
+  // unique constraint can, since constraints are not filtered by RLS. Re-read
+  // rather than reporting a failure the user cannot act on.
+  if (error?.code === "23505") {
+    const retry = await findSubmission(supabase, employeeId, month, year);
+    if ("error" in retry) return retry;
+    if (retry.row) return resolveExisting(retry.row);
+
+    return {
+      error:
+        "This month already exists but is not visible to your account. Sign out and back in, and tell an administrator if it persists.",
+    };
   }
 
-  return { id: created.id };
+  return {
+    error: `Could not open this month for editing: ${error?.message ?? "unknown error"}`,
+  };
 }
 
 export async function saveTrainingEntry(

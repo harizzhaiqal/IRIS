@@ -91,3 +91,13 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **Timestamps are `created_time` and `modified_time` across every table.** `training_attachments.uploaded_at` was folded into `created_time` for consistency, since the request covered all tables. `app_settings.updated_by` keeps its name — it is a person, not a timestamp. The rename deliberately stops at the schema boundary: `auth.users` and `auth.identities` belong to GoTrue and keep `created_at`/`updated_at`, as does the platform-stub code in both test harnesses.
 
 **`profiles` is now `public.users`.** Renamed throughout the schema, the RLS policies, the seed, the generated types, and `lib/queries/users.ts`. It sits alongside `auth.users` rather than replacing it: `public.users` is the staff directory that IRIS owns, `auth.users` is the credential store that Supabase Auth owns, and `public.users.id` references `auth.users(id)`. Every reference to the auth table in the SQL is schema-qualified, so the two never collide. Earlier entries in this file that mention `profiles` describe decisions made before the rename and are left as written.
+
+## Add training
+
+**`openSubmissionForEditing` no longer discards the Postgres error.** It previously destructured only `data` from the read and reported a fixed string, so "Could not open this month for editing" covered every possible cause and named none. The read error is now surfaced, and the insert reports the driver's own message.
+
+**A duplicate-key result on opening a month re-reads instead of failing.** Unique constraints are not filtered by RLS, so a row can block the insert while staying invisible to the select that preceded it — as can a second tab opening the same month. Both now recover by re-reading and using the row that exists. Only a row that is genuinely unreadable produces an error, and that message tells the employee what to do.
+
+**Submit from the entry form sends the whole month, not the entry.** The form's Submit saves the entry and then calls `submitMonth`, moving the month to `submitted_pending_hod` for HOD verification. The two steps report separately: if the entry saves but the submission fails, the message says so rather than implying the typing was lost. Explanatory copy under the buttons states that Submit closes the month to editing, because the button sits on a single-entry form where it would otherwise read as submitting just that entry.
+
+**"Save and add another" was dropped** in favour of the requested Save as draft / Submit / Cancel. Adding several entries now means saving each and returning through "Add training" from the month view.

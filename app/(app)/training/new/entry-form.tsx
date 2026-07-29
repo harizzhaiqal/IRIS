@@ -15,11 +15,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase/client";
 import { EFFECTIVENESS_LABELS, type Effectiveness } from "@/lib/types";
 import { calculateMinutes, hhmmToMinutes, minutesToHHMM } from "@/lib/utils/duration";
+import { monthName } from "@/lib/utils/targets";
 import {
   trainingEntryFormSchema,
   type TrainingEntryFormValues,
 } from "@/lib/validation/training";
-import { attachFile, removeAttachment, saveTrainingEntry } from "../actions";
+import {
+  attachFile,
+  removeAttachment,
+  saveTrainingEntry,
+  submitMonth,
+} from "../actions";
 
 export type ExistingAttachment = {
   id: string;
@@ -77,7 +83,7 @@ export function EntryForm({
     handleSubmit,
     watch,
     setValue,
-    reset,
+
     control,
     formState: { errors },
   } = useForm<TrainingEntryFormValues>({
@@ -187,31 +193,31 @@ export function EntryForm({
     });
   }
 
-  function submitAndAddAnother(values: TrainingEntryFormValues) {
+  /**
+   * Saves the entry, then sends the whole month to the HOD. The two steps are
+   * reported separately: if the month cannot be submitted the entry is still
+   * saved, and saying so stops the employee retyping it.
+   */
+  function saveAndSubmit(values: TrainingEntryFormValues) {
     setFormError(null);
     setIsBusy(true);
 
-    void persist(values).then(({ error }) => {
-      setIsBusy(false);
+    void persist(values).then(async ({ error }) => {
       if (error) {
+        setIsBusy(false);
         setFormError(error);
         return;
       }
 
-      reset({
-        title: "",
-        startDatetime: "",
-        endDatetime: "",
-        hours: "",
-        overrideReason: "",
-        location: values.location,
-        trainerProvider: "",
-        effectiveness: undefined,
-        remarks: "",
-      });
-      hoursTouched.current = false;
-      setFiles([]);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      const submitted = await submitMonth({ month, year });
+      setIsBusy(false);
+
+      if (!submitted.ok) {
+        setFormError(`Entry saved, but the month was not submitted. ${submitted.error}`);
+        return;
+      }
+
+      router.push(`/training?month=${month}&year=${year}`);
       router.refresh();
     });
   }
@@ -454,31 +460,38 @@ export function EntryForm({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={handleSubmit(submitAndClose)} disabled={isBusy}>
-          {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {isEditing ? "Save changes" : "Save as draft"}
-        </Button>
-
-        {!isEditing ? (
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
-            onClick={handleSubmit(submitAndAddAnother)}
+            onClick={handleSubmit(submitAndClose)}
             disabled={isBusy}
           >
-            Save and add another
+            {isBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save as draft
           </Button>
-        ) : null}
 
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => router.push(`/training?month=${month}&year=${year}`)}
-          disabled={isBusy}
-        >
-          Cancel
-        </Button>
+          <Button type="button" onClick={handleSubmit(saveAndSubmit)} disabled={isBusy}>
+            {isBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Submit
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => router.push(`/training?month=${month}&year=${year}`)}
+            disabled={isBusy}
+          >
+            Cancel
+          </Button>
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          Save as draft keeps {monthName(month)} {year} editable. Submit sends the whole month
+          to your HOD for verification, and it cannot be edited again unless it is
+          returned to you.
+        </p>
       </div>
     </form>
   );

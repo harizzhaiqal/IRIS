@@ -561,6 +561,49 @@ console.log("\n=== Privilege escalation ===");
   });
 }
 
+// The "add training" path end to end: open a month that does not exist yet,
+// then write an entry into it and confirm the total follows. This is the flow
+// that reported "Could not open this month for editing".
+console.log("\n=== Add training, start to finish ===");
+{
+  await asUser(STAFF_AIMAN, async () => {
+    const opened = await db.query(
+      `insert into public.training_submissions (employee_id, month, year, status)
+       values ($1, 3, 2027, 'draft') returning id`,
+      [STAFF_AIMAN],
+    );
+    check("staff can open a month that does not exist yet", opened.rows.length === 1);
+
+    const submissionId = opened.rows[0].id;
+
+    // A month the employee just opened must be readable back, or the action
+    // cannot tell an existing month from a missing one.
+    const readBack = await db.query(
+      `select id from public.training_submissions where employee_id = $1 and month = 3 and year = 2027`,
+      [STAFF_AIMAN],
+    );
+    check("the month just opened is visible to its owner", readBack.rows.length === 1);
+
+    const entry = await db.query(
+      `insert into public.training_records
+         (submission_id, seq_no, title, start_datetime, end_datetime,
+          calculated_minutes, recorded_minutes, effectiveness)
+       values ($1, 1, 'Regression entry', '2027-03-02T09:00:00Z', '2027-03-02T17:00:00Z',
+               480, 480, 'effective')
+       returning id`,
+      [submissionId],
+    );
+    check("staff can add an entry to their open month", entry.rows.length === 1);
+
+    const total = await db.query(
+      `select total_minutes from public.training_submissions where id = $1`,
+      [submissionId],
+    );
+    check("the total follows the new entry", total.rows[0]?.total_minutes === 480,
+      `got ${total.rows[0]?.total_minutes}`);
+  });
+}
+
 console.log(`\n${checks - failures}/${checks} checks passed`);
 await db.close();
 process.exit(failures === 0 ? 0 : 1);
