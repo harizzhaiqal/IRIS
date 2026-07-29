@@ -22,7 +22,7 @@ export function EntryRowActions({
   month,
   year,
 }: {
-  recordId: string;
+  recordId: number;
   title: string;
   month: number;
   year: number;

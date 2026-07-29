@@ -18,7 +18,7 @@ export type Database = {
           submission_deadline_day: number;
           reminder_enabled: boolean;
           updated_by: string | null;
-          updated_at: string;
+          modified_time: string;
         };
         Insert: {
           id?: boolean;
@@ -28,7 +28,7 @@ export type Database = {
           submission_deadline_day?: number;
           reminder_enabled?: boolean;
           updated_by?: string | null;
-          updated_at?: string;
+          modified_time?: string;
         };
         Update: {
           id?: boolean;
@@ -38,7 +38,7 @@ export type Database = {
           submission_deadline_day?: number;
           reminder_enabled?: boolean;
           updated_by?: string | null;
-          updated_at?: string;
+          modified_time?: string;
         };
         Relationships: [
           {
@@ -59,7 +59,7 @@ export type Database = {
           related_id: string | null;
           performed_by: string | null;
           is_system: boolean;
-          created_at: string;
+          created_time: string;
         };
         Insert: {
           id?: string;
@@ -69,7 +69,7 @@ export type Database = {
           related_id?: string | null;
           performed_by?: string | null;
           is_system?: boolean;
-          created_at?: string;
+          created_time?: string;
         };
         Update: {
           id?: string;
@@ -79,7 +79,7 @@ export type Database = {
           related_id?: string | null;
           performed_by?: string | null;
           is_system?: boolean;
-          created_at?: string;
+          created_time?: string;
         };
         Relationships: [
           {
@@ -96,19 +96,19 @@ export type Database = {
           id: string;
           name: string;
           hod_id: string | null;
-          created_at: string;
+          created_time: string;
         };
         Insert: {
           id?: string;
           name: string;
           hod_id?: string | null;
-          created_at?: string;
+          created_time?: string;
         };
         Update: {
           id?: string;
           name?: string;
           hod_id?: string | null;
-          created_at?: string;
+          created_time?: string;
         };
         Relationships: [
           {
@@ -131,7 +131,7 @@ export type Database = {
           department_id: string | null;
           hod_id: string | null;
           is_active: boolean;
-          created_at: string;
+          created_time: string;
         };
         Insert: {
           id: string;
@@ -143,7 +143,7 @@ export type Database = {
           department_id?: string | null;
           hod_id?: string | null;
           is_active?: boolean;
-          created_at?: string;
+          created_time?: string;
         };
         Update: {
           id?: string;
@@ -155,7 +155,7 @@ export type Database = {
           department_id?: string | null;
           hod_id?: string | null;
           is_active?: boolean;
-          created_at?: string;
+          created_time?: string;
         };
         Relationships: [
           {
@@ -184,27 +184,27 @@ export type Database = {
       training_attachments: {
         Row: {
           id: string;
-          training_record_id: string;
+          training_record_id: number;
           file_path: string;
           file_name: string;
           file_size: number;
-          uploaded_at: string;
+          created_time: string;
         };
         Insert: {
           id?: string;
-          training_record_id: string;
+          training_record_id: number;
           file_path: string;
           file_name: string;
           file_size?: number;
-          uploaded_at?: string;
+          created_time?: string;
         };
         Update: {
           id?: string;
-          training_record_id?: string;
+          training_record_id?: number;
           file_path?: string;
           file_name?: string;
           file_size?: number;
-          uploaded_at?: string;
+          created_time?: string;
         };
         Relationships: [
           {
@@ -218,7 +218,7 @@ export type Database = {
       };
       training_records: {
         Row: {
-          id: string;
+          id: number;
           submission_id: string;
           seq_no: number;
           title: string;
@@ -233,11 +233,11 @@ export type Database = {
             | Database["public"]["Enums"]["training_effectiveness"]
             | null;
           remarks: string | null;
-          created_at: string;
-          updated_at: string;
+          created_time: string;
+          modified_time: string;
         };
         Insert: {
-          id?: string;
+          id?: never;
           submission_id: string;
           seq_no?: number;
           title: string;
@@ -252,11 +252,11 @@ export type Database = {
             | Database["public"]["Enums"]["training_effectiveness"]
             | null;
           remarks?: string | null;
-          created_at?: string;
-          updated_at?: string;
+          created_time?: string;
+          modified_time?: string;
         };
         Update: {
-          id?: string;
+          id?: never;
           submission_id?: string;
           seq_no?: number;
           title?: string;
@@ -271,8 +271,8 @@ export type Database = {
             | Database["public"]["Enums"]["training_effectiveness"]
             | null;
           remarks?: string | null;
-          created_at?: string;
-          updated_at?: string;
+          created_time?: string;
+          modified_time?: string;
         };
         Relationships: [
           {
@@ -301,8 +301,8 @@ export type Database = {
           hr_verified_at: string | null;
           hr_comment: string | null;
           total_minutes: number;
-          created_at: string;
-          updated_at: string;
+          created_time: string;
+          modified_time: string;
         };
         Insert: {
           id?: string;
@@ -320,8 +320,8 @@ export type Database = {
           hr_verified_at?: string | null;
           hr_comment?: string | null;
           total_minutes?: number;
-          created_at?: string;
-          updated_at?: string;
+          created_time?: string;
+          modified_time?: string;
         };
         Update: {
           id?: string;
@@ -339,8 +339,8 @@ export type Database = {
           hr_verified_at?: string | null;
           hr_comment?: string | null;
           total_minutes?: number;
-          created_at?: string;
-          updated_at?: string;
+          created_time?: string;
+          modified_time?: string;
         };
         Relationships: [
           {

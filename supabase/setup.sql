@@ -91,7 +91,7 @@ create table public.departments (
   id uuid primary key default uuid_generate_v4(),
   name text not null unique,
   hod_id uuid,
-  created_at timestamptz not null default now()
+  created_time timestamptz not null default now()
 );
 
 create table public.profiles (
@@ -104,7 +104,7 @@ create table public.profiles (
   department_id uuid references public.departments (id) on delete set null,
   hod_id uuid references public.profiles (id) on delete set null,
   is_active boolean not null default true,
-  created_at timestamptz not null default now()
+  created_time timestamptz not null default now()
 );
 
 alter table public.departments
@@ -130,7 +130,7 @@ create table public.app_settings (
   submission_deadline_day integer not null default 10,
   reminder_enabled boolean not null default true,
   updated_by uuid references public.profiles (id) on delete set null,
-  updated_at timestamptz not null default now(),
+  modified_time timestamptz not null default now(),
   constraint app_settings_single_row check (id),
   constraint app_settings_deadline_day_valid
     check (submission_deadline_day between 1 and 28)
@@ -158,8 +158,8 @@ create table public.training_submissions (
   hr_verified_at timestamptz,
   hr_comment text,
   total_minutes integer not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
+  created_time timestamptz not null default now(),
+  modified_time timestamptz not null default now(),
   constraint training_submissions_employee_period_key
     unique (employee_id, month, year)
 );
@@ -179,8 +179,11 @@ create index training_submissions_status_idx
 -- excluded from a multi-day course, and reviewers are shown both.
 -- ---------------------------------------------------------------------------
 
+-- id counts 1, 2, 3 across the whole table. seq_no is separate and still
+-- numbers the entries within one month, which is what the paper form shows in
+-- its "No." column and what reviewers read down the page.
 create table public.training_records (
-  id uuid primary key default uuid_generate_v4(),
+  id bigint primary key generated always as identity,
   submission_id uuid not null
     references public.training_submissions (id) on delete cascade,
   seq_no integer not null default 1,
@@ -194,8 +197,8 @@ create table public.training_records (
   trainer_provider text,
   effectiveness public.training_effectiveness,
   remarks text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
+  created_time timestamptz not null default now(),
+  modified_time timestamptz not null default now(),
   constraint training_records_end_after_start check (end_datetime > start_datetime),
   -- An override away from the calculated duration must be explained.
   constraint training_records_override_needs_reason check (
@@ -213,12 +216,12 @@ create index training_records_submission_idx
 
 create table public.training_attachments (
   id uuid primary key default uuid_generate_v4(),
-  training_record_id uuid not null
+  training_record_id bigint not null
     references public.training_records (id) on delete cascade,
   file_path text not null,
   file_name text not null,
   file_size integer not null default 0,
-  uploaded_at timestamptz not null default now()
+  created_time timestamptz not null default now()
 );
 
 create index training_attachments_record_idx
@@ -233,38 +236,40 @@ create table public.automation_logs (
   action_type text not null,
   description text,
   related_table text,
-  related_id uuid,
+  -- text, not uuid: the log points at whichever table the action touched, and
+  -- those no longer share a key type now that training_records uses a bigint.
+  related_id text,
   performed_by uuid references public.profiles (id) on delete set null,
   is_system boolean not null default false,
-  created_at timestamptz not null default now()
+  created_time timestamptz not null default now()
 );
 
 create index automation_logs_related_idx
   on public.automation_logs (related_table, related_id);
-create index automation_logs_created_at_idx
-  on public.automation_logs (created_at desc);
+create index automation_logs_created_time_idx
+  on public.automation_logs (created_time desc);
 
 -- ---------------------------------------------------------------------------
 -- Triggers
 -- ---------------------------------------------------------------------------
 
-create or replace function public.touch_updated_at()
+create or replace function public.touch_modified_time()
 returns trigger
 language plpgsql
 as $$
 begin
-  new.updated_at := now();
+  new.modified_time := now();
   return new;
 end;
 $$;
 
-create trigger training_submissions_touch_updated_at
+create trigger training_submissions_touch_modified_time
   before update on public.training_submissions
-  for each row execute function public.touch_updated_at();
+  for each row execute function public.touch_modified_time();
 
-create trigger training_records_touch_updated_at
+create trigger training_records_touch_modified_time
   before update on public.training_records
-  for each row execute function public.touch_updated_at();
+  for each row execute function public.touch_modified_time();
 
 -- Keeps training_submissions.total_minutes in step with its child records.
 -- Owned by the database so no application path can leave the total stale.
@@ -1354,7 +1359,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 insert into public.automation_logs (
-  action_type, description, related_table, related_id, performed_by, is_system, created_at
+  action_type, description, related_table, related_id, performed_by, is_system, created_time
 )
 select
   case s.status
@@ -1374,7 +1379,7 @@ select
   s.id,
   coalesce(s.hr_verified_by, s.hod_verified_by, s.employee_id),
   false,
-  coalesce(s.hr_verified_at, s.hod_verified_at, s.submitted_at, s.created_at)
+  coalesce(s.hr_verified_at, s.hod_verified_at, s.submitted_at, s.created_time)
 from public.training_submissions s
 join public.profiles p on p.id = s.employee_id
 where s.status <> 'draft';

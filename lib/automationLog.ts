@@ -6,7 +6,8 @@ export type AutomationLogEntry = {
   actionType: string;
   description?: string;
   relatedTable?: string;
-  relatedId?: string;
+  /** uuid for most tables, bigint for training_records; stored as text. */
+  relatedId?: string | number;
   performedBy?: string | null;
   isSystem?: boolean;
 };
@@ -27,7 +28,7 @@ export async function logAction(entry: AutomationLogEntry): Promise<void> {
       action_type: entry.actionType,
       description: entry.description ?? null,
       related_table: entry.relatedTable ?? null,
-      related_id: entry.relatedId ?? null,
+      related_id: entry.relatedId === undefined ? null : String(entry.relatedId),
       performed_by: entry.performedBy ?? null,
       is_system: entry.isSystem ?? false,
     });

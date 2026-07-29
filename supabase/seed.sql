@@ -535,7 +535,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 insert into public.automation_logs (
-  action_type, description, related_table, related_id, performed_by, is_system, created_at
+  action_type, description, related_table, related_id, performed_by, is_system, created_time
 )
 select
   case s.status
@@ -555,7 +555,7 @@ select
   s.id,
   coalesce(s.hr_verified_by, s.hod_verified_by, s.employee_id),
   false,
-  coalesce(s.hr_verified_at, s.hod_verified_at, s.submitted_at, s.created_at)
+  coalesce(s.hr_verified_at, s.hod_verified_at, s.submitted_at, s.created_time)
 from public.training_submissions s
 join public.profiles p on p.id = s.employee_id
 where s.status <> 'draft';

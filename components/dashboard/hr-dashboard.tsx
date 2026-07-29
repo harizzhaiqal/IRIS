@@ -327,7 +327,7 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
                     </p>
                   </div>
                   <span className="whitespace-nowrap text-xs text-muted-foreground">
-                    {new Date(entry.created_at).toLocaleDateString(undefined, {
+                    {new Date(entry.created_time).toLocaleDateString(undefined, {
                       dateStyle: "medium",
                     })}
                   </span>

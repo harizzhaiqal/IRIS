@@ -4,7 +4,7 @@ export type ActivityEntry = {
   id: string;
   action_type: string;
   description: string | null;
-  created_at: string;
+  created_time: string;
 };
 
 /**
@@ -18,8 +18,8 @@ export async function listRecentActivity(
 
   const { data } = await supabase
     .from("automation_logs")
-    .select("id, action_type, description, created_at")
-    .order("created_at", { ascending: false })
+    .select("id, action_type, description, created_time")
+    .order("created_time", { ascending: false })
     .limit(limit);
 
   return data ?? [];

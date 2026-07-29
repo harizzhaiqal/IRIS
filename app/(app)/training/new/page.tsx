@@ -47,6 +47,11 @@ export default async function NewTrainingPage({
   let existingAttachments: { id: string; file_name: string }[] = [];
 
   if (searchParams.recordId) {
+    // The id is a bigint now, so a hand-edited ?recordId=abc is not found
+    // rather than passed to the query as a string.
+    const recordId = Number(searchParams.recordId);
+    if (!Number.isInteger(recordId) || recordId <= 0) notFound();
+
     const supabase = createClient();
 
     const { data: record } = await supabase
@@ -54,7 +59,7 @@ export default async function NewTrainingPage({
       .select(
         "*, submission:training_submissions!inner ( id, status, employee_id, month, year ), attachments:training_attachments ( id, file_name )",
       )
-      .eq("id", searchParams.recordId)
+      .eq("id", recordId)
       .maybeSingle();
 
     if (!record) notFound();

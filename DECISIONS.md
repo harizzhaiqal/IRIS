@@ -81,3 +81,11 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **The warning badge is the one element carrying dark text.** White on amber reaches 4.17:1, below AA, and the amber dark enough to carry white text reads brown rather than as a warning. Dark text on a true amber keeps the meaning and measures 8.19:1. The inconsistency with the other badges is deliberate and is the standard resolution for amber.
 
 **Contrast was measured in the browser, not estimated.** Every foreground/background pair was computed from resolved `rgb()` values on the running page: body text 16.3:1, muted text 5.6:1, primary button 6.3:1, success 5.1:1, warning 8.2:1, destructive 5.8:1. The warning failure was found this way rather than by eye.
+
+## Schema naming and keys
+
+**`training_records.id` is a bigint identity counting 1, 2, 3.** `seq_no` is unchanged and still numbers entries within a single month, which is what the paper form's "No." column shows and what a reviewer reads down the page. The two are different things: `id` is unique across the table, `seq_no` restarts every month.
+
+**`automation_logs.related_id` became text.** It points at whichever table an action touched, and those no longer share a key type now that `training_records` uses a bigint while everything else uses uuid. A uuid column could no longer hold a training-record reference.
+
+**Timestamps are `created_time` and `modified_time` across every table.** `training_attachments.uploaded_at` was folded into `created_time` for consistency, since the request covered all tables. `app_settings.updated_by` keeps its name — it is a person, not a timestamp. The rename deliberately stops at the schema boundary: `auth.users` and `auth.identities` belong to GoTrue and keep `created_at`/`updated_at`, as does the platform-stub code in both test harnesses.

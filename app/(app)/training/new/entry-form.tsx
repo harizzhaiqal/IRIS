@@ -27,7 +27,7 @@ export type ExistingAttachment = {
 };
 
 export type EntryFormDefaults = {
-  recordId?: string;
+  recordId?: number;
   title: string;
   startDatetime: string;
   endDatetime: string;
@@ -114,7 +114,7 @@ export function EntryForm({
     setValue("hours", minutesToHHMM(calculatedMinutes));
   }, [calculatedMinutes, setValue]);
 
-  async function uploadFiles(recordId: string): Promise<string | null> {
+  async function uploadFiles(recordId: number): Promise<string | null> {
     if (files.length === 0) return null;
 
     const supabase = createClient();

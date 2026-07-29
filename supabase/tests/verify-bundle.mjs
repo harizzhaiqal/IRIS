@@ -155,6 +155,24 @@ const { rows: dupes } = await db.query(`
 `);
 check("no duplicate demo accounts after re-run", dupes.length === 0, JSON.stringify(dupes));
 
+// training_records.id is a bigint identity: it should read 1, 2, 3 with no gaps
+// across a fresh seed, not a uuid and not an arbitrary starting point.
+const { rows: ids } = await db.query(`
+  select
+    min(id)::int as lo,
+    max(id)::int as hi,
+    count(*)::int as n,
+    (select data_type from information_schema.columns
+      where table_name = 'training_records' and column_name = 'id') as type
+  from public.training_records
+`);
+check("training_records.id is an integer type", ids[0].type === "bigint", ids[0].type);
+check(
+  "training_records.id counts 1..n with no gaps",
+  ids[0].lo === 1 && ids[0].hi === ids[0].n,
+  `lo=${ids[0].lo} hi=${ids[0].hi} n=${ids[0].n}`,
+);
+
 // Recreating the public schema discards Supabase's default privileges for it,
 // so the migration must grant table access itself. Without this the app builds,
 // deploys, signs a user in, and then fails every query it makes.

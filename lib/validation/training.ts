@@ -11,7 +11,9 @@ export const periodSchema = z.object({
 
 export const trainingEntrySchema = z
   .object({
-    recordId: z.string().uuid().optional(),
+    // Coerced: this arrives as a string from the ?edit= query param and from
+    // form data, but the column is a bigint identity.
+    recordId: z.coerce.number().int().positive().optional(),
     month: z.number().int().min(1).max(12),
     year: z.number().int().min(2000).max(2100),
     title: z
@@ -144,7 +146,7 @@ export const trainingEntryFormSchema = z
 export type TrainingEntryFormValues = z.infer<typeof trainingEntryFormSchema>;
 
 export const attachmentSchema = z.object({
-  recordId: z.string().uuid(),
+  recordId: z.coerce.number().int().positive(),
   filePath: z.string().min(1).max(500),
   fileName: z.string().min(1).max(255),
   fileSize: z.number().int().min(0),

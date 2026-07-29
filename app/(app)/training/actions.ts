@@ -70,7 +70,7 @@ async function openSubmissionForEditing(
 
 export async function saveTrainingEntry(
   input: unknown,
-): Promise<ActionResult<{ recordId: string }>> {
+): Promise<ActionResult<{ recordId: number }>> {
   const profile = await requireProfile();
 
   const parsed = trainingEntrySchema.safeParse(input);
@@ -164,7 +164,7 @@ export async function saveTrainingEntry(
 }
 
 export async function deleteTrainingEntry(
-  recordId: string,
+  recordId: number,
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   const supabase = createClient();
