@@ -28,7 +28,7 @@ import {
 } from "../actions";
 
 export type ExistingAttachment = {
-  id: string;
+  id: number;
   file_name: string;
 };
 
@@ -62,7 +62,7 @@ export function EntryForm({
 }: {
   month: number;
   year: number;
-  userId: string;
+  userId: number;
   defaults: EntryFormDefaults;
   existingAttachments: ExistingAttachment[];
 }) {
@@ -222,7 +222,7 @@ export function EntryForm({
     });
   }
 
-  async function dropExisting(attachmentId: string) {
+  async function dropExisting(attachmentId: number) {
     setIsBusy(true);
     const result = await removeAttachment(attachmentId);
     setIsBusy(false);

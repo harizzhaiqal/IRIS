@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 export type ActivityEntry = {
-  id: string;
+  id: number;
   action_type: string;
   description: string | null;
   created_time: string;

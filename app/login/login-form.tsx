@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,9 +13,20 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
 
-export function LoginForm({ redirectTo }: { redirectTo?: string }) {
+/**
+ * `bare` drops the card shell for layouts that already provide one — the
+ * split-screen design puts the form directly on the page, not in a box.
+ */
+export function LoginForm({
+  redirectTo,
+  bare = false,
+}: {
+  redirectTo?: string;
+  bare?: boolean;
+}) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -47,59 +58,83 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
     router.refresh();
   }
 
+  const form = (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="name@irs.com.my"
+          autoComplete="email"
+          autoFocus
+          aria-invalid={Boolean(errors.email)}
+          {...register("email")}
+        />
+        {errors.email ? (
+          <p className="text-sm text-destructive">{errors.email.message}</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <div className="relative">
+          <Input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            className="pr-10"
+            aria-invalid={Boolean(errors.password)}
+            {...register("password")}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((shown) => !shown)}
+            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+        {errors.password ? (
+          <p className="text-sm text-destructive">{errors.password.message}</p>
+        ) : null}
+      </div>
+
+      {formError ? (
+        <p
+          className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          role="alert"
+        >
+          {formError}
+        </p>
+      ) : null}
+
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Signing in
+          </>
+        ) : (
+          <>
+            <LogIn className="h-4 w-4" />
+            Sign in
+          </>
+        )}
+      </Button>
+    </form>
+  );
+
+  if (bare) return form;
+
   return (
     <Card>
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              autoFocus
-              aria-invalid={Boolean(errors.email)}
-              {...register("email")}
-            />
-            {errors.email ? (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            ) : null}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              aria-invalid={Boolean(errors.password)}
-              {...register("password")}
-            />
-            {errors.password ? (
-              <p className="text-sm text-destructive">
-                {errors.password.message}
-              </p>
-            ) : null}
-          </div>
-
-          {formError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {formError}
-            </p>
-          ) : null}
-
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Signing in
-              </>
-            ) : (
-              "Sign in"
-            )}
-          </Button>
-        </form>
-      </CardContent>
+      <CardContent className="pt-6">{form}</CardContent>
     </Card>
   );
 }

@@ -44,11 +44,11 @@ export default async function NewTrainingPage({
     remarks: "",
   };
 
-  let existingAttachments: { id: string; file_name: string }[] = [];
+  let existingAttachments: { id: number; file_name: string }[] = [];
 
   if (searchParams.recordId) {
-    // The id is a bigint now, so a hand-edited ?recordId=abc is not found
-    // rather than passed to the query as a string.
+    // The id is an integer, so a hand-edited ?recordId=abc is not found rather
+    // than passed to the query as a string.
     const recordId = Number(searchParams.recordId);
     if (!Number.isInteger(recordId) || recordId <= 0) notFound();
 
@@ -66,7 +66,7 @@ export default async function NewTrainingPage({
 
     const submission = record.submission as unknown as {
       status: Parameters<typeof isEditableStatus>[0];
-      employee_id: string;
+      employee_id: number;
       month: number;
       year: number;
     };
@@ -91,7 +91,7 @@ export default async function NewTrainingPage({
     };
 
     existingAttachments =
-      (record.attachments as unknown as { id: string; file_name: string }[]) ??
+      (record.attachments as unknown as { id: number; file_name: string }[]) ??
       [];
   }
 

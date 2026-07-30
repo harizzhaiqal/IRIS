@@ -12,25 +12,25 @@ export type RecordWithAttachments = TrainingRecord & {
 
 export type SubmissionDetail = TrainingSubmission & {
   employee: {
-    id: string;
+    id: number;
     full_name: string;
     email: string;
     designation: string | null;
     date_joined: string | null;
-    hod_id: string | null;
-    department: { id: string; name: string } | null;
+    hod_id: number | null;
+    department: { id: number; name: string } | null;
   } | null;
-  hod_verifier: { id: string; full_name: string } | null;
-  hr_verifier: { id: string; full_name: string } | null;
+  hod_verifier: { id: number; full_name: string } | null;
+  hr_verifier: { id: number; full_name: string } | null;
   records: RecordWithAttachments[];
 };
 
 export type SubmissionListItem = TrainingSubmission & {
   employee: {
-    id: string;
+    id: number;
     full_name: string;
     designation: string | null;
-    department: { id: string; name: string } | null;
+    department: { id: number; name: string } | null;
   } | null;
 };
 
@@ -58,7 +58,7 @@ const DETAIL_SELECT = `
 
 /** One employee's month, or null if they have not opened it yet. */
 export async function getSubmissionForMonth(
-  employeeId: string,
+  employeeId: number,
   month: number,
   year: number,
 ): Promise<SubmissionDetail | null> {
@@ -81,7 +81,7 @@ export async function getSubmissionForMonth(
 }
 
 export async function getSubmissionById(
-  id: string,
+  id: number,
 ): Promise<SubmissionDetail | null> {
   const supabase = createClient();
 
@@ -101,7 +101,7 @@ export async function getSubmissionById(
 
 /** Every month an employee has opened in a year, oldest first. */
 export async function listYearSubmissions(
-  employeeId: string,
+  employeeId: number,
   year: number,
 ): Promise<TrainingSubmission[]> {
   const supabase = createClient();
@@ -121,7 +121,7 @@ export async function listYearSubmissions(
  * dashboards do not fan out into a query per person.
  */
 export async function listYearSubmissionsForEmployees(
-  employeeIds: string[],
+  employeeIds: number[],
   year: number,
 ): Promise<
   Pick<
@@ -143,7 +143,7 @@ export async function listYearSubmissionsForEmployees(
 }
 
 export async function listTeamSubmissionsForMonth(
-  employeeIds: string[],
+  employeeIds: number[],
   month: number,
   year: number,
 ): Promise<SubmissionListItem[]> {
@@ -165,9 +165,9 @@ export async function listTeamSubmissionsForMonth(
 export type SubmissionFilters = {
   month?: number | null;
   year?: number | null;
-  departmentId?: string | null;
+  departmentId?: number | null;
   status?: SubmissionStatus | null;
-  employeeId?: string | null;
+  employeeId?: number | null;
 };
 
 /** HR's company-wide view. RLS restricts this to hr_admin. */
@@ -179,7 +179,7 @@ export async function listSubmissions(
   // Department lives on the employee, not the submission. Resolving it to a
   // list of ids first avoids filtering across an embedded resource, where a
   // non-matching row comes back with a null embed instead of being excluded.
-  let departmentEmployeeIds: string[] | null = null;
+  let departmentEmployeeIds: number[] | null = null;
   if (filters.departmentId) {
     const { data: members } = await supabase
       .from("users")
@@ -211,7 +211,7 @@ export async function listSubmissions(
 /** Submissions sitting at a given verification stage, for reviewer queues. */
 export async function countSubmissionsByStatus(
   status: SubmissionStatus,
-  employeeIds?: string[],
+  employeeIds?: number[],
 ): Promise<number> {
   const supabase = createClient();
 

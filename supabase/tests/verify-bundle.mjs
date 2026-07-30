@@ -155,23 +155,40 @@ const { rows: dupes } = await db.query(`
 `);
 check("no duplicate demo accounts after re-run", dupes.length === 0, JSON.stringify(dupes));
 
-// training_records.id is a bigint identity: it should read 1, 2, 3 with no gaps
-// across a fresh seed, not a uuid and not an arbitrary starting point.
-const { rows: ids } = await db.query(`
-  select
-    min(id)::int as lo,
-    max(id)::int as hi,
-    count(*)::int as n,
-    (select data_type from information_schema.columns
-      where table_name = 'training_records' and column_name = 'id') as type
-  from public.training_records
+// Every id in the schema is an integer identity, and a re-run rebuilds the
+// schema from scratch, so the keys must read 1, 2, 3 with no gaps — not carry
+// over from the previous run's sequence.
+const { rows: idTypes } = await db.query(`
+  select table_name, data_type from information_schema.columns
+   where table_schema = 'public' and column_name = 'id'
+   order by table_name
 `);
-check("training_records.id is an integer type", ids[0].type === "bigint", ids[0].type);
 check(
-  "training_records.id counts 1..n with no gaps",
-  ids[0].lo === 1 && ids[0].hi === ids[0].n,
-  `lo=${ids[0].lo} hi=${ids[0].hi} n=${ids[0].n}`,
+  "every public id column is an integer",
+  idTypes.length > 0 && idTypes.every((r) => r.data_type === "integer"),
+  idTypes.map((r) => `${r.table_name}=${r.data_type}`).join(", "),
 );
+
+for (const table of ["users", "departments", "training_submissions", "training_records"]) {
+  const { rows } = await db.query(`
+    select min(id)::int as lo, max(id)::int as hi, count(*)::int as n
+      from public.${table}
+  `);
+  check(
+    `${table}.id counts 1..n after the re-run`,
+    rows[0].lo === 1 && rows[0].hi === rows[0].n,
+    `lo=${rows[0].lo} hi=${rows[0].hi} n=${rows[0].n}`,
+  );
+}
+
+// The one uuid the design keeps: public.users points at auth.users, which
+// Supabase Auth owns and keys by uuid. Every row must carry that link, or the
+// user exists in the directory and cannot sign in.
+const { rows: links } = await db.query(`
+  select count(*)::int as n from public.users u
+   join auth.users a on a.id = u.auth_user_id
+`);
+check("every profile links to an auth account", links[0].n === 11, `got ${links[0].n}`);
 
 // Recreating the public schema discards Supabase's default privileges for it,
 // so the migration must grant table access itself. Without this the app builds,

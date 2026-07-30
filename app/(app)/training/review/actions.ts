@@ -118,7 +118,7 @@ export async function reviewSubmission(input: unknown): Promise<Result> {
  * abandon the rest.
  */
 export async function bulkApprove(
-  submissionIds: string[],
+  submissionIds: number[],
 ): Promise<{ ok: true; approved: number; failed: number } | { ok: false; error: string }> {
   const profile = await requireProfile();
 

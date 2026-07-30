@@ -22,7 +22,7 @@ import { monthName } from "@/lib/utils/targets";
 import { bulkApprove } from "../review/actions";
 
 export type SubmissionRow = {
-  id: string;
+  id: number;
   month: number;
   year: number;
   status: SubmissionStatus;
@@ -36,7 +36,7 @@ export type SubmissionRow = {
 export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
 
   // Only submissions already past the HOD stage can be approved in bulk.
@@ -48,7 +48,7 @@ export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
   const allSelected =
     selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
 
-  function toggle(id: string, checked: boolean) {
+  function toggle(id: number, checked: boolean) {
     setSelected((current) => {
       const next = new Set(current);
       if (checked) next.add(id);

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type DepartmentOption = { id: string; name: string };
+export type DepartmentOption = { id: number; name: string };
 
 export async function listDepartments(): Promise<DepartmentOption[]> {
   const supabase = createClient();

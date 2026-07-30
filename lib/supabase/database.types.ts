@@ -6,38 +6,49 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+/**
+ * Every `id` in the public schema is an integer identity column, so ids are
+ * numbers here. The single exception is `users.auth_user_id`: it points at
+ * `auth.users`, which Supabase Auth owns and keys by uuid, so that one column
+ * stays a string.
+ *
+ * Identity columns are `generated always`, which the database refuses to accept
+ * a written value for. Those are typed `never` on Insert and Update so a
+ * client-supplied key does not compile.
+ */
 export type Database = {
   public: {
     Tables: {
       app_settings: {
         Row: {
-          id: boolean;
+          id: number;
           monthly_standard_hours: number;
           yearly_standard_hours: number;
           yearly_threshold_hours: number;
           submission_deadline_day: number;
           reminder_enabled: boolean;
-          updated_by: string | null;
+          updated_by: number | null;
           modified_time: string;
         };
         Insert: {
-          id?: boolean;
+          // Not an identity column: the row is a singleton pinned to id 1.
+          id?: number;
           monthly_standard_hours?: number;
           yearly_standard_hours?: number;
           yearly_threshold_hours?: number;
           submission_deadline_day?: number;
           reminder_enabled?: boolean;
-          updated_by?: string | null;
+          updated_by?: number | null;
           modified_time?: string;
         };
         Update: {
-          id?: boolean;
+          id?: number;
           monthly_standard_hours?: number;
           yearly_standard_hours?: number;
           yearly_threshold_hours?: number;
           submission_deadline_day?: number;
           reminder_enabled?: boolean;
-          updated_by?: string | null;
+          updated_by?: number | null;
           modified_time?: string;
         };
         Relationships: [
@@ -52,32 +63,32 @@ export type Database = {
       };
       automation_logs: {
         Row: {
-          id: string;
+          id: number;
           action_type: string;
           description: string | null;
           related_table: string | null;
-          related_id: string | null;
-          performed_by: string | null;
+          related_id: number | null;
+          performed_by: number | null;
           is_system: boolean;
           created_time: string;
         };
         Insert: {
-          id?: string;
+          id?: never;
           action_type: string;
           description?: string | null;
           related_table?: string | null;
-          related_id?: string | null;
-          performed_by?: string | null;
+          related_id?: number | null;
+          performed_by?: number | null;
           is_system?: boolean;
           created_time?: string;
         };
         Update: {
-          id?: string;
+          id?: never;
           action_type?: string;
           description?: string | null;
           related_table?: string | null;
-          related_id?: string | null;
-          performed_by?: string | null;
+          related_id?: number | null;
+          performed_by?: number | null;
           is_system?: boolean;
           created_time?: string;
         };
@@ -93,21 +104,21 @@ export type Database = {
       };
       departments: {
         Row: {
-          id: string;
+          id: number;
           name: string;
-          hod_id: string | null;
+          hod_id: number | null;
           created_time: string;
         };
         Insert: {
-          id?: string;
+          id?: never;
           name: string;
-          hod_id?: string | null;
+          hod_id?: number | null;
           created_time?: string;
         };
         Update: {
-          id?: string;
+          id?: never;
           name?: string;
-          hod_id?: string | null;
+          hod_id?: number | null;
           created_time?: string;
         };
         Relationships: [
@@ -122,42 +133,52 @@ export type Database = {
       };
       users: {
         Row: {
-          id: string;
+          id: number;
+          auth_user_id: string;
           full_name: string;
           email: string;
           designation: string | null;
           date_joined: string | null;
           role: Database["public"]["Enums"]["user_role"];
-          department_id: string | null;
-          hod_id: string | null;
+          department_id: number | null;
+          hod_id: number | null;
           is_active: boolean;
           created_time: string;
         };
         Insert: {
-          id: string;
+          id?: never;
+          auth_user_id: string;
           full_name: string;
           email: string;
           designation?: string | null;
           date_joined?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
-          department_id?: string | null;
-          hod_id?: string | null;
+          department_id?: number | null;
+          hod_id?: number | null;
           is_active?: boolean;
           created_time?: string;
         };
         Update: {
-          id?: string;
+          id?: never;
+          auth_user_id?: string;
           full_name?: string;
           email?: string;
           designation?: string | null;
           date_joined?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
-          department_id?: string | null;
-          hod_id?: string | null;
+          department_id?: number | null;
+          hod_id?: number | null;
           is_active?: boolean;
           created_time?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "users_auth_user_id_fkey";
+            columns: ["auth_user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "users_department_id_fkey";
             columns: ["department_id"];
@@ -172,18 +193,11 @@ export type Database = {
             referencedRelation: "users";
             referencedColumns: ["id"];
           },
-          {
-            foreignKeyName: "users_id_fkey";
-            columns: ["id"];
-            isOneToOne: true;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
         ];
       };
       training_attachments: {
         Row: {
-          id: string;
+          id: number;
           training_record_id: number;
           file_path: string;
           file_name: string;
@@ -191,7 +205,7 @@ export type Database = {
           created_time: string;
         };
         Insert: {
-          id?: string;
+          id?: never;
           training_record_id: number;
           file_path: string;
           file_name: string;
@@ -199,7 +213,7 @@ export type Database = {
           created_time?: string;
         };
         Update: {
-          id?: string;
+          id?: never;
           training_record_id?: number;
           file_path?: string;
           file_name?: string;
@@ -219,7 +233,7 @@ export type Database = {
       training_records: {
         Row: {
           id: number;
-          submission_id: string;
+          submission_id: number;
           seq_no: number;
           title: string;
           start_datetime: string;
@@ -238,7 +252,7 @@ export type Database = {
         };
         Insert: {
           id?: never;
-          submission_id: string;
+          submission_id: number;
           seq_no?: number;
           title: string;
           start_datetime: string;
@@ -257,7 +271,7 @@ export type Database = {
         };
         Update: {
           id?: never;
-          submission_id?: string;
+          submission_id?: number;
           seq_no?: number;
           title?: string;
           start_datetime?: string;
@@ -286,18 +300,18 @@ export type Database = {
       };
       training_submissions: {
         Row: {
-          id: string;
-          employee_id: string;
+          id: number;
+          employee_id: number;
           month: number;
           year: number;
           status: Database["public"]["Enums"]["submission_status"];
           is_nil_return: boolean;
           submitted_at: string | null;
           is_late: boolean;
-          hod_verified_by: string | null;
+          hod_verified_by: number | null;
           hod_verified_at: string | null;
           hod_comment: string | null;
-          hr_verified_by: string | null;
+          hr_verified_by: number | null;
           hr_verified_at: string | null;
           hr_comment: string | null;
           total_minutes: number;
@@ -305,18 +319,18 @@ export type Database = {
           modified_time: string;
         };
         Insert: {
-          id?: string;
-          employee_id: string;
+          id?: never;
+          employee_id: number;
           month: number;
           year: number;
           status?: Database["public"]["Enums"]["submission_status"];
           is_nil_return?: boolean;
           submitted_at?: string | null;
           is_late?: boolean;
-          hod_verified_by?: string | null;
+          hod_verified_by?: number | null;
           hod_verified_at?: string | null;
           hod_comment?: string | null;
-          hr_verified_by?: string | null;
+          hr_verified_by?: number | null;
           hr_verified_at?: string | null;
           hr_comment?: string | null;
           total_minutes?: number;
@@ -324,18 +338,18 @@ export type Database = {
           modified_time?: string;
         };
         Update: {
-          id?: string;
-          employee_id?: string;
+          id?: never;
+          employee_id?: number;
           month?: number;
           year?: number;
           status?: Database["public"]["Enums"]["submission_status"];
           is_nil_return?: boolean;
           submitted_at?: string | null;
           is_late?: boolean;
-          hod_verified_by?: string | null;
+          hod_verified_by?: number | null;
           hod_verified_at?: string | null;
           hod_comment?: string | null;
-          hr_verified_by?: string | null;
+          hr_verified_by?: number | null;
           hr_verified_at?: string | null;
           hr_comment?: string | null;
           total_minutes?: number;
@@ -372,12 +386,16 @@ export type Database = {
     };
     Functions: {
       can_edit_submission: {
-        Args: { submission: string };
+        Args: { submission: number };
         Returns: boolean;
       };
       can_view_submission: {
-        Args: { submission: string };
+        Args: { submission: number };
         Returns: boolean;
+      };
+      current_user_id: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
       };
       current_user_role: {
         Args: Record<PropertyKey, never>;
@@ -388,8 +406,12 @@ export type Database = {
         Returns: boolean;
       };
       is_my_team_member: {
-        Args: { employee: string };
+        Args: { employee: number };
         Returns: boolean;
+      };
+      storage_path_owner: {
+        Args: { object_name: string };
+        Returns: number;
       };
     };
     Enums: {

@@ -20,7 +20,7 @@ export function VerificationPanel({
   viewerRole,
   isOwnSubmission,
 }: {
-  submissionId: string;
+  submissionId: number;
   status: SubmissionStatus;
   viewerRole: UserRole;
   isOwnSubmission: boolean;

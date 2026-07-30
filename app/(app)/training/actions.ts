@@ -28,7 +28,7 @@ function failed(error: string): { ok: false; error: string } {
  * if the month exists but is closed to editing.
  */
 type OpenableRow = {
-  id: string;
+  id: number;
   status: SubmissionStatus;
   is_nil_return: boolean;
 };
@@ -36,7 +36,7 @@ type OpenableRow = {
 /** Reads the month, keeping the Postgres error rather than discarding it. */
 async function findSubmission(
   supabase: ReturnType<typeof createClient>,
-  employeeId: string,
+  employeeId: number,
   month: number,
   year: number,
 ): Promise<{ row: OpenableRow | null } | { error: string }> {
@@ -53,7 +53,7 @@ async function findSubmission(
 }
 
 /** Turns a found row into an id, or explains why the month is closed. */
-function resolveExisting(row: OpenableRow): { id: string } | { error: string } {
+function resolveExisting(row: OpenableRow): { id: number } | { error: string } {
   if (!isEditableStatus(row.status)) {
     return { error: "This month has been submitted and cannot be edited." };
   }
@@ -67,10 +67,10 @@ function resolveExisting(row: OpenableRow): { id: string } | { error: string } {
 }
 
 async function openSubmissionForEditing(
-  employeeId: string,
+  employeeId: number,
   month: number,
   year: number,
-): Promise<{ id: string } | { error: string }> {
+): Promise<{ id: number } | { error: string }> {
   const supabase = createClient();
 
   const found = await findSubmission(supabase, employeeId, month, year);
@@ -235,20 +235,26 @@ export async function attachFile(input: unknown): Promise<ActionResult> {
 
   const supabase = createClient();
 
-  const { error } = await supabase.from("training_attachments").insert({
-    training_record_id: parsed.data.recordId,
-    file_path: parsed.data.filePath,
-    file_name: parsed.data.fileName,
-    file_size: parsed.data.fileSize,
-  });
+  // The new row's own id is read back so the audit entry points at the
+  // attachment it names, rather than at the training record behind it.
+  const { data: created, error } = await supabase
+    .from("training_attachments")
+    .insert({
+      training_record_id: parsed.data.recordId,
+      file_path: parsed.data.filePath,
+      file_name: parsed.data.fileName,
+      file_size: parsed.data.fileSize,
+    })
+    .select("id")
+    .single();
 
-  if (error) return failed("That file could not be attached.");
+  if (error || !created) return failed("That file could not be attached.");
 
   await logAction({
     actionType: "training_attachment.added",
     description: `${profile.full_name} attached ${parsed.data.fileName}`,
     relatedTable: "training_attachments",
-    relatedId: parsed.data.recordId,
+    relatedId: created.id,
     performedBy: profile.id,
   });
 
@@ -257,7 +263,7 @@ export async function attachFile(input: unknown): Promise<ActionResult> {
 }
 
 export async function removeAttachment(
-  attachmentId: string,
+  attachmentId: number,
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   const supabase = createClient();

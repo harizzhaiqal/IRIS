@@ -32,6 +32,12 @@ function parseStatus(value?: string): SubmissionStatus | null {
     : null;
 }
 
+/** Department and employee filters are integer keys arriving as query strings. */
+function parseId(value?: string): number | null {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 export default async function SubmissionsPage({
   searchParams,
 }: {
@@ -51,9 +57,9 @@ export default async function SubmissionsPage({
 
   const month = monthParam >= 1 && monthParam <= 12 ? monthParam : null;
   const year = yearParam >= 2000 && yearParam <= 2100 ? yearParam : null;
-  const departmentId = searchParams.department ?? null;
+  const departmentId = parseId(searchParams.department);
   const status = parseStatus(searchParams.status);
-  const employeeId = searchParams.employee ?? null;
+  const employeeId = parseId(searchParams.employee);
 
   const [departments, employees, submissions] = await Promise.all([
     listDepartments(),

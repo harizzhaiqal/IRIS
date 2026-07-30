@@ -2,19 +2,19 @@ import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 
 export type ProfileSummary = {
-  id: string;
+  id: number;
   full_name: string;
   email: string;
   designation: string | null;
   date_joined: string | null;
-  department_id: string | null;
-  hod_id: string | null;
+  department_id: number | null;
+  hod_id: number | null;
 };
 
 const SUMMARY_COLUMNS =
   "id, full_name, email, designation, date_joined, department_id, hod_id";
 
-export async function getProfileById(id: string): Promise<Profile | null> {
+export async function getProfileById(id: number): Promise<Profile | null> {
   const supabase = createClient();
 
   const { data } = await supabase
@@ -27,7 +27,7 @@ export async function getProfileById(id: string): Promise<Profile | null> {
 }
 
 /** Just the display name, for verification trails and headers. */
-export async function getProfileName(id: string | null): Promise<string | null> {
+export async function getProfileName(id: number | null): Promise<string | null> {
   if (!id) return null;
 
   const supabase = createClient();
@@ -42,7 +42,7 @@ export async function getProfileName(id: string | null): Promise<string | null> 
 }
 
 /** Active employees reporting to the given HOD. */
-export async function listTeamMembers(hodId: string): Promise<ProfileSummary[]> {
+export async function listTeamMembers(hodId: number): Promise<ProfileSummary[]> {
   const supabase = createClient();
 
   const { data } = await supabase

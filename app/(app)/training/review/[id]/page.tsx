@@ -20,6 +20,7 @@ import { getTargets } from "@/lib/queries/settings";
 import { getSubmissionById } from "@/lib/queries/submissions";
 import { minutesToHHMM } from "@/lib/utils/duration";
 import { monthName } from "@/lib/utils/targets";
+import { idParamSchema } from "@/lib/validation/training";
 import { VerificationPanel } from "./verification-panel";
 
 export const metadata = { title: "Review submission — IRIS" };
@@ -36,8 +37,11 @@ export default async function ReviewSubmissionPage({
 }) {
   const profile = await requireProfile();
 
+  const id = idParamSchema.safeParse(params.id);
+  if (!id.success) notFound();
+
   // RLS decides visibility, so an id the viewer may not see reads as missing.
-  const submission = await getSubmissionById(params.id);
+  const submission = await getSubmissionById(id.data);
   if (!submission) notFound();
 
   const [targets, hodName, hrName, employeeHodName] = await Promise.all([

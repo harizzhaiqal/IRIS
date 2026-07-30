@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { GraduationCap, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 
+import { SidebarHeader } from "@/components/app-shell/sidebar-header";
 import { SidebarNav } from "@/components/app-shell/sidebar-nav";
+import { IrisLogo } from "@/components/brand/iris-logo";
 import { Button } from "@/components/ui/button";
 import { requireProfile } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/types";
@@ -16,15 +18,7 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen bg-muted/40">
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-background lg:flex">
-        <div className="flex h-16 items-center gap-2 border-b px-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <GraduationCap className="h-4 w-4" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold">IRIS</p>
-            <p className="text-xs text-muted-foreground">Training records</p>
-          </div>
-        </div>
+        <SidebarHeader />
 
         <div className="flex-1 p-3">
           <SidebarNav role={profile.role} />
@@ -53,11 +47,8 @@ export default async function AppLayout({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 items-center justify-between gap-4 border-b bg-background px-4 lg:hidden">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <GraduationCap className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-semibold">IRIS</span>
+          <Link href="/dashboard" className="flex items-center">
+            <IrisLogo size="sm" />
           </Link>
           <form action="/auth/signout" method="post">
             <Button type="submit" variant="ghost" size="sm">

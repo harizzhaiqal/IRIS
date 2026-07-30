@@ -6,7 +6,21 @@
 -- These are `security definer` so that a policy on `users` can read the
 -- caller's role without re-entering `users` policies. Selecting from
 -- users inside a users policy recurses and takes the whole table down.
+--
+-- auth.uid() returns the caller's uuid from their JWT, because Supabase Auth
+-- keys on uuid. Every policy below works in integer ids, so current_user_id()
+-- is the single place that crosses between the two.
 -- ---------------------------------------------------------------------------
+
+create or replace function public.current_user_id()
+returns integer
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select id from public.users where auth_user_id = auth.uid();
+$$;
 
 create or replace function public.current_user_role()
 returns public.user_role
@@ -15,7 +29,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select role from public.users where id = auth.uid();
+  select role from public.users where auth_user_id = auth.uid();
 $$;
 
 create or replace function public.is_hr_admin()
@@ -29,7 +43,7 @@ as $$
 $$;
 
 -- True when the given employee reports to the caller.
-create or replace function public.is_my_team_member(employee uuid)
+create or replace function public.is_my_team_member(employee integer)
 returns boolean
 language sql
 stable
@@ -38,12 +52,12 @@ set search_path = public
 as $$
   select exists (
     select 1 from public.users
-     where id = employee and hod_id = auth.uid()
+     where id = employee and hod_id = public.current_user_id()
   );
 $$;
 
 -- Single place defining who may see a submission, reused by the child tables.
-create or replace function public.can_view_submission(submission uuid)
+create or replace function public.can_view_submission(submission integer)
 returns boolean
 language sql
 stable
@@ -55,7 +69,7 @@ as $$
       from public.training_submissions s
      where s.id = submission
        and (
-         s.employee_id = auth.uid()
+         s.employee_id = public.current_user_id()
          or public.is_my_team_member(s.employee_id)
          or public.is_hr_admin()
        )
@@ -63,7 +77,7 @@ as $$
 $$;
 
 -- A submission is open for employee edits only in these three states.
-create or replace function public.can_edit_submission(submission uuid)
+create or replace function public.can_edit_submission(submission integer)
 returns boolean
 language sql
 stable
@@ -74,22 +88,24 @@ as $$
     select 1
       from public.training_submissions s
      where s.id = submission
-       and s.employee_id = auth.uid()
+       and s.employee_id = public.current_user_id()
        and s.status in ('draft', 'returned_by_hod', 'rejected')
   );
 $$;
 
+revoke execute on function public.current_user_id() from public;
 revoke execute on function public.current_user_role() from public;
 revoke execute on function public.is_hr_admin() from public;
-revoke execute on function public.is_my_team_member(uuid) from public;
-revoke execute on function public.can_view_submission(uuid) from public;
-revoke execute on function public.can_edit_submission(uuid) from public;
+revoke execute on function public.is_my_team_member(integer) from public;
+revoke execute on function public.can_view_submission(integer) from public;
+revoke execute on function public.can_edit_submission(integer) from public;
 
+grant execute on function public.current_user_id() to authenticated;
 grant execute on function public.current_user_role() to authenticated;
 grant execute on function public.is_hr_admin() to authenticated;
-grant execute on function public.is_my_team_member(uuid) to authenticated;
-grant execute on function public.can_view_submission(uuid) to authenticated;
-grant execute on function public.can_edit_submission(uuid) to authenticated;
+grant execute on function public.is_my_team_member(integer) to authenticated;
+grant execute on function public.can_view_submission(integer) to authenticated;
+grant execute on function public.can_edit_submission(integer) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Enable RLS everywhere.
@@ -114,12 +130,14 @@ create policy users_select_authenticated on public.users
   for select to authenticated
   using (true);
 
--- A user may maintain their own profile. Role and reporting line are locked
--- down separately by the users_guard_privileged_fields trigger.
+-- A user may maintain their own profile. Matched on auth_user_id rather than
+-- id, so the check reads straight from the JWT with no lookup. Role and
+-- reporting line are locked down separately by the
+-- users_guard_privileged_fields trigger.
 create policy users_update_own on public.users
   for update to authenticated
-  using (id = auth.uid())
-  with check (id = auth.uid());
+  using (auth_user_id = auth.uid())
+  with check (auth_user_id = auth.uid());
 
 -- Only HR administers the staff list.
 create policy users_all_hr_admin on public.users
@@ -138,6 +156,12 @@ as $$
 begin
   if auth.uid() is null or public.is_hr_admin() then
     return new;
+  end if;
+
+  -- The credential link is not a profile field: rebinding it would hand one
+  -- person another's account.
+  if new.auth_user_id is distinct from old.auth_user_id then
+    raise exception 'The sign-in account behind a user cannot be reassigned';
   end if;
 
   if new.role is distinct from old.role
@@ -188,7 +212,7 @@ create policy app_settings_update_hr_admin on public.app_settings
 -- An employee sees their own months.
 create policy training_submissions_select_own on public.training_submissions
   for select to authenticated
-  using (employee_id = auth.uid());
+  using (employee_id = public.current_user_id());
 
 -- A HOD sees every month belonging to someone who reports to them.
 create policy training_submissions_select_team on public.training_submissions
@@ -203,17 +227,17 @@ create policy training_submissions_select_hr on public.training_submissions
 -- An employee opens their own month, and only as a draft.
 create policy training_submissions_insert_own on public.training_submissions
   for insert to authenticated
-  with check (employee_id = auth.uid() and status = 'draft');
+  with check (employee_id = public.current_user_id() and status = 'draft');
 
 -- An employee edits their own month only while it is open to them. Which
 -- columns they may touch is enforced by enforce_submission_update_rules.
 create policy training_submissions_update_own on public.training_submissions
   for update to authenticated
   using (
-    employee_id = auth.uid()
+    employee_id = public.current_user_id()
     and status in ('draft', 'returned_by_hod', 'rejected')
   )
-  with check (employee_id = auth.uid());
+  with check (employee_id = public.current_user_id());
 
 -- A HOD acts on their team's submissions; the trigger limits them to the
 -- HOD verification columns.
@@ -231,7 +255,7 @@ create policy training_submissions_update_hr on public.training_submissions
 -- An employee may discard a month only while it is still a draft.
 create policy training_submissions_delete_own_draft on public.training_submissions
   for delete to authenticated
-  using (employee_id = auth.uid() and status = 'draft');
+  using (employee_id = public.current_user_id() and status = 'draft');
 
 -- ---------------------------------------------------------------------------
 -- training_records — visibility follows the parent submission, editing is
@@ -314,7 +338,11 @@ security definer
 set search_path = public
 as $$
 declare
-  actor uuid := auth.uid();
+  -- The JWT subject and the profile it resolves to are read separately. A
+  -- signed-in caller with no profile row must not fall into the absent-JWT
+  -- case below, which is trusted.
+  caller uuid := auth.uid();
+  actor integer;
   actor_role public.user_role;
   is_owner boolean;
 begin
@@ -327,10 +355,11 @@ begin
   );
 
   -- Server-side jobs using the service-role key have no JWT and are trusted.
-  if actor is null then
+  if caller is null then
     return new;
   end if;
 
+  actor := public.current_user_id();
   actor_role := public.current_user_role();
   is_owner := (new.employee_id = actor);
 
@@ -429,13 +458,31 @@ create trigger training_submissions_enforce_update_rules
 -- ---------------------------------------------------------------------------
 -- Storage: supporting documents for training entries.
 --
--- Paths are laid out as <employee_id>/<training_record_id>/<filename> so the
--- owner check is a prefix comparison on the first path segment.
+-- Paths are laid out as <employee_id>/<training_record_id>/<filename>, both
+-- integers now, so the owner check is a comparison on the first path segment.
 -- ---------------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public)
 values ('training-attachments', 'training-attachments', false)
 on conflict (id) do nothing;
+
+-- The insert policy below is the only route by which a path enters this
+-- bucket, so the first segment is always a plain integer. The cast is still
+-- guarded: an object placed by any other means must fail closed rather than
+-- raise, which in a policy would take the whole listing down.
+create or replace function public.storage_path_owner(object_name text)
+returns integer
+language sql
+immutable
+as $$
+  select case
+    when (storage.foldername(object_name))[1] ~ '^[0-9]+$'
+    then ((storage.foldername(object_name))[1])::integer
+  end;
+$$;
+
+revoke execute on function public.storage_path_owner(text) from public;
+grant execute on function public.storage_path_owner(text) to authenticated;
 
 -- Owners read their own files; HODs and HR read via the same rules that let
 -- them see the submission, which for storage reduces to team membership.
@@ -444,9 +491,9 @@ create policy training_attachments_storage_select on storage.objects
   using (
     bucket_id = 'training-attachments'
     and (
-      (storage.foldername(name))[1] = auth.uid()::text
+      public.storage_path_owner(name) = public.current_user_id()
       or public.is_hr_admin()
-      or public.is_my_team_member(((storage.foldername(name))[1])::uuid)
+      or public.is_my_team_member(public.storage_path_owner(name))
     )
   );
 
@@ -454,14 +501,14 @@ create policy training_attachments_storage_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'training-attachments'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and public.storage_path_owner(name) = public.current_user_id()
   );
 
 create policy training_attachments_storage_delete on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'training-attachments'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and public.storage_path_owner(name) = public.current_user_id()
   );
 
 -- ---------------------------------------------------------------------------

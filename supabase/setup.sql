@@ -16,9 +16,10 @@ create schema public;
 grant usage on schema public to anon, authenticated, service_role;
 grant all on schema public to postgres;
 
--- Pinned to the extensions schema so the drop above can never take them with
--- it. Supabase preinstalls both, making these no-ops on a fresh project.
-create extension if not exists "uuid-ossp" with schema extensions;
+-- Pinned to the extensions schema so the drop above can never take it with it.
+-- Supabase preinstalls pgcrypto, making this a no-op on a fresh project. The
+-- seed needs it for crypt() and gen_salt(); nothing needs uuid-ossp any more,
+-- because every key in the schema is a generated integer.
 create extension if not exists pgcrypto with schema extensions;
 
 set search_path = public, extensions;
@@ -56,8 +57,12 @@ delete from auth.users where email like '%@irssoftware.test';
 
 -- IRIS: Employee Training Records module — core schema.
 -- Replaces form IRS-HR-F14 (Employee Training Record & Evaluation).
-
-create extension if not exists "uuid-ossp";
+--
+-- Every table in this schema keys on `id integer generated always as identity`,
+-- so ids read 1, 2, 3, 4. The one uuid left in the design is
+-- users.auth_user_id: it points at auth.users, which Supabase Auth owns and
+-- keys by uuid, so that column carries the credential link while public.users
+-- keeps its own integer key.
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -88,21 +93,24 @@ create type public.training_effectiveness as enum (
 -- ---------------------------------------------------------------------------
 
 create table public.departments (
-  id uuid primary key default uuid_generate_v4(),
+  id integer primary key generated always as identity,
   name text not null unique,
-  hod_id uuid,
+  hod_id integer,
   created_time timestamptz not null default now()
 );
 
 create table public.users (
-  id uuid primary key references auth.users (id) on delete cascade,
+  id integer primary key generated always as identity,
+  -- The Supabase Auth account behind this person. auth.users is GoTrue's table
+  -- and keys by uuid, so the link is a uuid even though this table is not.
+  auth_user_id uuid not null unique references auth.users (id) on delete cascade,
   full_name text not null,
   email text not null unique,
   designation text,
   date_joined date,
   role public.user_role not null default 'staff',
-  department_id uuid references public.departments (id) on delete set null,
-  hod_id uuid references public.users (id) on delete set null,
+  department_id integer references public.departments (id) on delete set null,
+  hod_id integer references public.users (id) on delete set null,
   is_active boolean not null default true,
   created_time timestamptz not null default now()
 );
@@ -111,6 +119,8 @@ alter table public.departments
   add constraint departments_hod_id_fkey
   foreign key (hod_id) references public.users (id) on delete set null;
 
+-- Every request resolves auth.uid() to this row, so the lookup is indexed by
+-- the unique constraint above; these cover the reporting-line queries.
 create index users_department_id_idx on public.users (department_id);
 create index users_hod_id_idx on public.users (hod_id);
 create index users_role_idx on public.users (role);
@@ -123,38 +133,40 @@ create index users_role_idx on public.users (role);
 -- ---------------------------------------------------------------------------
 
 create table public.app_settings (
-  id boolean primary key default true,
+  id integer primary key default 1,
   monthly_standard_hours integer not null default 4,
   yearly_standard_hours integer not null default 48,
   yearly_threshold_hours integer not null default 36,
   submission_deadline_day integer not null default 10,
   reminder_enabled boolean not null default true,
-  updated_by uuid references public.users (id) on delete set null,
+  updated_by integer references public.users (id) on delete set null,
   modified_time timestamptz not null default now(),
-  constraint app_settings_single_row check (id),
+  -- Not an identity column: the row is a singleton, so the key is pinned to 1
+  -- rather than counting upward.
+  constraint app_settings_single_row check (id = 1),
   constraint app_settings_deadline_day_valid
     check (submission_deadline_day between 1 and 28)
 );
 
-insert into public.app_settings (id) values (true);
+insert into public.app_settings (id) values (1);
 
 -- ---------------------------------------------------------------------------
 -- Training submissions — one per employee per month.
 -- ---------------------------------------------------------------------------
 
 create table public.training_submissions (
-  id uuid primary key default uuid_generate_v4(),
-  employee_id uuid not null references public.users (id) on delete cascade,
+  id integer primary key generated always as identity,
+  employee_id integer not null references public.users (id) on delete cascade,
   month integer not null check (month between 1 and 12),
   year integer not null check (year between 2000 and 2100),
   status public.submission_status not null default 'draft',
   is_nil_return boolean not null default false,
   submitted_at timestamptz,
   is_late boolean not null default false,
-  hod_verified_by uuid references public.users (id) on delete set null,
+  hod_verified_by integer references public.users (id) on delete set null,
   hod_verified_at timestamptz,
   hod_comment text,
-  hr_verified_by uuid references public.users (id) on delete set null,
+  hr_verified_by integer references public.users (id) on delete set null,
   hr_verified_at timestamptz,
   hr_comment text,
   total_minutes integer not null default 0,
@@ -183,8 +195,8 @@ create index training_submissions_status_idx
 -- numbers the entries within one month, which is what the paper form shows in
 -- its "No." column and what reviewers read down the page.
 create table public.training_records (
-  id bigint primary key generated always as identity,
-  submission_id uuid not null
+  id integer primary key generated always as identity,
+  submission_id integer not null
     references public.training_submissions (id) on delete cascade,
   seq_no integer not null default 1,
   title text not null,
@@ -215,8 +227,8 @@ create index training_records_submission_idx
 -- ---------------------------------------------------------------------------
 
 create table public.training_attachments (
-  id uuid primary key default uuid_generate_v4(),
-  training_record_id bigint not null
+  id integer primary key generated always as identity,
+  training_record_id integer not null
     references public.training_records (id) on delete cascade,
   file_path text not null,
   file_name text not null,
@@ -232,14 +244,15 @@ create index training_attachments_record_idx
 -- ---------------------------------------------------------------------------
 
 create table public.automation_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id integer primary key generated always as identity,
   action_type text not null,
   description text,
   related_table text,
-  -- text, not uuid: the log points at whichever table the action touched, and
-  -- those no longer share a key type now that training_records uses a bigint.
-  related_id text,
-  performed_by uuid references public.users (id) on delete set null,
+  -- integer, not text: the log points at whichever table the action touched,
+  -- and every table in this schema now keys on integer, so one column type
+  -- covers them all. related_table says which table the id belongs to.
+  related_id integer,
+  performed_by integer references public.users (id) on delete set null,
   is_system boolean not null default false,
   created_time timestamptz not null default now()
 );
@@ -280,7 +293,7 @@ security definer
 set search_path = public
 as $$
 declare
-  target_submission uuid := coalesce(new.submission_id, old.submission_id);
+  target_submission integer := coalesce(new.submission_id, old.submission_id);
 begin
   update public.training_submissions
      set total_minutes = coalesce(
@@ -332,7 +345,21 @@ create trigger training_submissions_nil_return_guard
 -- These are `security definer` so that a policy on `users` can read the
 -- caller's role without re-entering `users` policies. Selecting from
 -- users inside a users policy recurses and takes the whole table down.
+--
+-- auth.uid() returns the caller's uuid from their JWT, because Supabase Auth
+-- keys on uuid. Every policy below works in integer ids, so current_user_id()
+-- is the single place that crosses between the two.
 -- ---------------------------------------------------------------------------
+
+create or replace function public.current_user_id()
+returns integer
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select id from public.users where auth_user_id = auth.uid();
+$$;
 
 create or replace function public.current_user_role()
 returns public.user_role
@@ -341,7 +368,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select role from public.users where id = auth.uid();
+  select role from public.users where auth_user_id = auth.uid();
 $$;
 
 create or replace function public.is_hr_admin()
@@ -355,7 +382,7 @@ as $$
 $$;
 
 -- True when the given employee reports to the caller.
-create or replace function public.is_my_team_member(employee uuid)
+create or replace function public.is_my_team_member(employee integer)
 returns boolean
 language sql
 stable
@@ -364,12 +391,12 @@ set search_path = public
 as $$
   select exists (
     select 1 from public.users
-     where id = employee and hod_id = auth.uid()
+     where id = employee and hod_id = public.current_user_id()
   );
 $$;
 
 -- Single place defining who may see a submission, reused by the child tables.
-create or replace function public.can_view_submission(submission uuid)
+create or replace function public.can_view_submission(submission integer)
 returns boolean
 language sql
 stable
@@ -381,7 +408,7 @@ as $$
       from public.training_submissions s
      where s.id = submission
        and (
-         s.employee_id = auth.uid()
+         s.employee_id = public.current_user_id()
          or public.is_my_team_member(s.employee_id)
          or public.is_hr_admin()
        )
@@ -389,7 +416,7 @@ as $$
 $$;
 
 -- A submission is open for employee edits only in these three states.
-create or replace function public.can_edit_submission(submission uuid)
+create or replace function public.can_edit_submission(submission integer)
 returns boolean
 language sql
 stable
@@ -400,22 +427,24 @@ as $$
     select 1
       from public.training_submissions s
      where s.id = submission
-       and s.employee_id = auth.uid()
+       and s.employee_id = public.current_user_id()
        and s.status in ('draft', 'returned_by_hod', 'rejected')
   );
 $$;
 
+revoke execute on function public.current_user_id() from public;
 revoke execute on function public.current_user_role() from public;
 revoke execute on function public.is_hr_admin() from public;
-revoke execute on function public.is_my_team_member(uuid) from public;
-revoke execute on function public.can_view_submission(uuid) from public;
-revoke execute on function public.can_edit_submission(uuid) from public;
+revoke execute on function public.is_my_team_member(integer) from public;
+revoke execute on function public.can_view_submission(integer) from public;
+revoke execute on function public.can_edit_submission(integer) from public;
 
+grant execute on function public.current_user_id() to authenticated;
 grant execute on function public.current_user_role() to authenticated;
 grant execute on function public.is_hr_admin() to authenticated;
-grant execute on function public.is_my_team_member(uuid) to authenticated;
-grant execute on function public.can_view_submission(uuid) to authenticated;
-grant execute on function public.can_edit_submission(uuid) to authenticated;
+grant execute on function public.is_my_team_member(integer) to authenticated;
+grant execute on function public.can_view_submission(integer) to authenticated;
+grant execute on function public.can_edit_submission(integer) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Enable RLS everywhere.
@@ -440,12 +469,14 @@ create policy users_select_authenticated on public.users
   for select to authenticated
   using (true);
 
--- A user may maintain their own profile. Role and reporting line are locked
--- down separately by the users_guard_privileged_fields trigger.
+-- A user may maintain their own profile. Matched on auth_user_id rather than
+-- id, so the check reads straight from the JWT with no lookup. Role and
+-- reporting line are locked down separately by the
+-- users_guard_privileged_fields trigger.
 create policy users_update_own on public.users
   for update to authenticated
-  using (id = auth.uid())
-  with check (id = auth.uid());
+  using (auth_user_id = auth.uid())
+  with check (auth_user_id = auth.uid());
 
 -- Only HR administers the staff list.
 create policy users_all_hr_admin on public.users
@@ -464,6 +495,12 @@ as $$
 begin
   if auth.uid() is null or public.is_hr_admin() then
     return new;
+  end if;
+
+  -- The credential link is not a profile field: rebinding it would hand one
+  -- person another's account.
+  if new.auth_user_id is distinct from old.auth_user_id then
+    raise exception 'The sign-in account behind a user cannot be reassigned';
   end if;
 
   if new.role is distinct from old.role
@@ -514,7 +551,7 @@ create policy app_settings_update_hr_admin on public.app_settings
 -- An employee sees their own months.
 create policy training_submissions_select_own on public.training_submissions
   for select to authenticated
-  using (employee_id = auth.uid());
+  using (employee_id = public.current_user_id());
 
 -- A HOD sees every month belonging to someone who reports to them.
 create policy training_submissions_select_team on public.training_submissions
@@ -529,17 +566,17 @@ create policy training_submissions_select_hr on public.training_submissions
 -- An employee opens their own month, and only as a draft.
 create policy training_submissions_insert_own on public.training_submissions
   for insert to authenticated
-  with check (employee_id = auth.uid() and status = 'draft');
+  with check (employee_id = public.current_user_id() and status = 'draft');
 
 -- An employee edits their own month only while it is open to them. Which
 -- columns they may touch is enforced by enforce_submission_update_rules.
 create policy training_submissions_update_own on public.training_submissions
   for update to authenticated
   using (
-    employee_id = auth.uid()
+    employee_id = public.current_user_id()
     and status in ('draft', 'returned_by_hod', 'rejected')
   )
-  with check (employee_id = auth.uid());
+  with check (employee_id = public.current_user_id());
 
 -- A HOD acts on their team's submissions; the trigger limits them to the
 -- HOD verification columns.
@@ -557,7 +594,7 @@ create policy training_submissions_update_hr on public.training_submissions
 -- An employee may discard a month only while it is still a draft.
 create policy training_submissions_delete_own_draft on public.training_submissions
   for delete to authenticated
-  using (employee_id = auth.uid() and status = 'draft');
+  using (employee_id = public.current_user_id() and status = 'draft');
 
 -- ---------------------------------------------------------------------------
 -- training_records — visibility follows the parent submission, editing is
@@ -640,7 +677,11 @@ security definer
 set search_path = public
 as $$
 declare
-  actor uuid := auth.uid();
+  -- The JWT subject and the profile it resolves to are read separately. A
+  -- signed-in caller with no profile row must not fall into the absent-JWT
+  -- case below, which is trusted.
+  caller uuid := auth.uid();
+  actor integer;
   actor_role public.user_role;
   is_owner boolean;
 begin
@@ -653,10 +694,11 @@ begin
   );
 
   -- Server-side jobs using the service-role key have no JWT and are trusted.
-  if actor is null then
+  if caller is null then
     return new;
   end if;
 
+  actor := public.current_user_id();
   actor_role := public.current_user_role();
   is_owner := (new.employee_id = actor);
 
@@ -755,13 +797,31 @@ create trigger training_submissions_enforce_update_rules
 -- ---------------------------------------------------------------------------
 -- Storage: supporting documents for training entries.
 --
--- Paths are laid out as <employee_id>/<training_record_id>/<filename> so the
--- owner check is a prefix comparison on the first path segment.
+-- Paths are laid out as <employee_id>/<training_record_id>/<filename>, both
+-- integers now, so the owner check is a comparison on the first path segment.
 -- ---------------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public)
 values ('training-attachments', 'training-attachments', false)
 on conflict (id) do nothing;
+
+-- The insert policy below is the only route by which a path enters this
+-- bucket, so the first segment is always a plain integer. The cast is still
+-- guarded: an object placed by any other means must fail closed rather than
+-- raise, which in a policy would take the whole listing down.
+create or replace function public.storage_path_owner(object_name text)
+returns integer
+language sql
+immutable
+as $$
+  select case
+    when (storage.foldername(object_name))[1] ~ '^[0-9]+$'
+    then ((storage.foldername(object_name))[1])::integer
+  end;
+$$;
+
+revoke execute on function public.storage_path_owner(text) from public;
+grant execute on function public.storage_path_owner(text) to authenticated;
 
 -- Owners read their own files; HODs and HR read via the same rules that let
 -- them see the submission, which for storage reduces to team membership.
@@ -770,9 +830,9 @@ create policy training_attachments_storage_select on storage.objects
   using (
     bucket_id = 'training-attachments'
     and (
-      (storage.foldername(name))[1] = auth.uid()::text
+      public.storage_path_owner(name) = public.current_user_id()
       or public.is_hr_admin()
-      or public.is_my_team_member(((storage.foldername(name))[1])::uuid)
+      or public.is_my_team_member(public.storage_path_owner(name))
     )
   );
 
@@ -780,14 +840,14 @@ create policy training_attachments_storage_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'training-attachments'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and public.storage_path_owner(name) = public.current_user_id()
   );
 
 create policy training_attachments_storage_delete on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'training-attachments'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and public.storage_path_owner(name) = public.current_user_id()
   );
 
 -- ---------------------------------------------------------------------------
@@ -831,6 +891,13 @@ alter default privileges in schema public
 -- spanning every status: approved, pending HOD, pending HR, returned,
 -- rejected, overdue, and nil return. Monthly hours vary widely enough that the
 -- compliance dashboard shows genuine spread rather than a flat line.
+--
+-- public.users.id, public.departments.id and every other key in this schema is
+-- generated by the database, so nothing here can name an id up front. Rows are
+-- resolved by email for people and by name for departments — the two natural
+-- keys the schema already declares unique. The auth.users uuids stay literal:
+-- that table belongs to Supabase Auth and keys on uuid, and fixed values make a
+-- re-run reuse the same accounts rather than accumulate new ones.
 
 create extension if not exists pgcrypto with schema extensions;
 
@@ -838,22 +905,25 @@ set search_path = public, extensions;
 
 -- ---------------------------------------------------------------------------
 -- Account creation helper. Writes the auth.users and auth.identities rows that
--- GoTrue needs for email/password sign-in, then the matching profile.
+-- GoTrue needs for email/password sign-in, then the matching profile, and
+-- returns the integer id the database assigned that profile.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.seed_account(
-  p_id uuid,
+  p_auth_id uuid,
   p_email text,
   p_full_name text,
   p_designation text,
   p_role public.user_role,
-  p_department_id uuid,
-  p_hod_id uuid,
+  p_department_name text,
+  p_hod_email text,
   p_date_joined date
 )
-returns uuid
+returns integer
 language plpgsql
 as $$
+declare
+  v_user_id integer;
 begin
   insert into auth.users (
     instance_id, id, aud, role, email, encrypted_password,
@@ -861,7 +931,7 @@ begin
     confirmation_token, email_change, email_change_token_new, recovery_token,
     raw_app_meta_data, raw_user_meta_data
   ) values (
-    '00000000-0000-0000-0000-000000000000', p_id, 'authenticated', 'authenticated',
+    '00000000-0000-0000-0000-000000000000', p_auth_id, 'authenticated', 'authenticated',
     p_email, extensions.crypt('Password123!', extensions.gen_salt('bf')),
     now(), now(), now(),
     '', '', '', '',
@@ -874,23 +944,27 @@ begin
     id, user_id, identity_data, provider, provider_id,
     last_sign_in_at, created_at, updated_at
   ) values (
-    gen_random_uuid(), p_id,
-    jsonb_build_object('sub', p_id::text, 'email', p_email),
-    'email', p_id::text,
+    gen_random_uuid(), p_auth_id,
+    jsonb_build_object('sub', p_auth_id::text, 'email', p_email),
+    'email', p_auth_id::text,
     now(), now(), now()
   )
   on conflict do nothing;
 
   insert into public.users (
-    id, full_name, email, designation, date_joined,
+    auth_user_id, full_name, email, designation, date_joined,
     role, department_id, hod_id, is_active
   ) values (
-    p_id, p_full_name, p_email, p_designation, p_date_joined,
-    p_role, p_department_id, p_hod_id, true
+    p_auth_id, p_full_name, p_email, p_designation, p_date_joined,
+    p_role,
+    (select id from public.departments where name = p_department_name),
+    (select id from public.users where email = p_hod_email),
+    true
   )
-  on conflict (id) do nothing;
+  on conflict (email) do nothing;
 
-  return p_id;
+  select id into v_user_id from public.users where email = p_email;
+  return v_user_id;
 end;
 $$;
 
@@ -898,13 +972,13 @@ $$;
 -- Departments and people
 -- ---------------------------------------------------------------------------
 
-insert into public.departments (id, name) values
-  ('dddddddd-0000-0000-0000-000000000001', 'Software Development'),
-  ('dddddddd-0000-0000-0000-000000000002', 'Sales'),
-  ('dddddddd-0000-0000-0000-000000000003', 'Support')
-on conflict (id) do nothing;
+insert into public.departments (name) values
+  ('Software Development'),
+  ('Sales'),
+  ('Support')
+on conflict (name) do nothing;
 
--- HR first: it has no reporting line of its own.
+-- HR first: it has no department or reporting line of its own.
 select public.seed_account(
   '11111111-1111-1111-1111-111111111111', 'hr@irssoftware.test',
   'Nurul Aina Binti Rahim', 'HR Manager', 'hr_admin',
@@ -916,95 +990,82 @@ select public.seed_account(
 select public.seed_account(
   '22222222-2222-2222-2222-222222222222', 'faizal@irssoftware.test',
   'Mohd Faizal Bin Osman', 'Head of Software Development', 'hod',
-  'dddddddd-0000-0000-0000-000000000001',
-  null, date '2017-06-12'
+  'Software Development', null, date '2017-06-12'
 );
 
 select public.seed_account(
   '33333333-3333-3333-3333-333333333333', 'sharon@irssoftware.test',
   'Sharon Lim Wei Ling', 'Head of Sales and Support', 'hod',
-  'dddddddd-0000-0000-0000-000000000002',
-  null, date '2018-01-22'
+  'Sales', null, date '2018-01-22'
 );
 
 -- Each HOD verifies the other's own submissions, so a HOD's personal record
 -- still passes a HOD stage before it reaches HR.
 update public.users
-   set hod_id = '33333333-3333-3333-3333-333333333333'
- where id = '22222222-2222-2222-2222-222222222222';
+   set hod_id = (select id from public.users where email = 'sharon@irssoftware.test')
+ where email = 'faizal@irssoftware.test';
 
 update public.users
-   set hod_id = '22222222-2222-2222-2222-222222222222'
- where id = '33333333-3333-3333-3333-333333333333';
+   set hod_id = (select id from public.users where email = 'faizal@irssoftware.test')
+ where email = 'sharon@irssoftware.test';
 
 update public.departments
-   set hod_id = '22222222-2222-2222-2222-222222222222'
- where id = 'dddddddd-0000-0000-0000-000000000001';
+   set hod_id = (select id from public.users where email = 'faizal@irssoftware.test')
+ where name = 'Software Development';
 
 update public.departments
-   set hod_id = '33333333-3333-3333-3333-333333333333'
- where id in (
-   'dddddddd-0000-0000-0000-000000000002',
-   'dddddddd-0000-0000-0000-000000000003'
- );
+   set hod_id = (select id from public.users where email = 'sharon@irssoftware.test')
+ where name in ('Sales', 'Support');
 
 -- Software Development reports to Faizal.
 select public.seed_account(
   '44444444-4444-4444-4444-444444444444', 'aiman@irssoftware.test',
   'Aiman Hakim Bin Zulkifli', 'Senior Software Engineer', 'staff',
-  'dddddddd-0000-0000-0000-000000000001',
-  '22222222-2222-2222-2222-222222222222', date '2020-02-17'
+  'Software Development', 'faizal@irssoftware.test', date '2020-02-17'
 );
 
 select public.seed_account(
   '55555555-5555-5555-5555-555555555555', 'preetha@irssoftware.test',
   'Preetha Devi A/P Ganesan', 'Software Engineer', 'staff',
-  'dddddddd-0000-0000-0000-000000000001',
-  '22222222-2222-2222-2222-222222222222', date '2021-08-02'
+  'Software Development', 'faizal@irssoftware.test', date '2021-08-02'
 );
 
 select public.seed_account(
   '66666666-6666-6666-6666-666666666666', 'wenjie@irssoftware.test',
   'Tan Wen Jie', 'QA Engineer', 'staff',
-  'dddddddd-0000-0000-0000-000000000001',
-  '22222222-2222-2222-2222-222222222222', date '2022-04-11'
+  'Software Development', 'faizal@irssoftware.test', date '2022-04-11'
 );
 
 select public.seed_account(
   '77777777-7777-7777-7777-777777777777', 'syafiq@irssoftware.test',
   'Muhammad Syafiq Bin Ramli', 'Junior Software Engineer', 'staff',
-  'dddddddd-0000-0000-0000-000000000001',
-  '22222222-2222-2222-2222-222222222222', date '2024-09-16'
+  'Software Development', 'faizal@irssoftware.test', date '2024-09-16'
 );
 
 -- Sales reports to Sharon.
 select public.seed_account(
   '88888888-8888-8888-8888-888888888888', 'nadia@irssoftware.test',
   'Nadia Farhana Binti Yusof', 'Account Executive', 'staff',
-  'dddddddd-0000-0000-0000-000000000002',
-  '33333333-3333-3333-3333-333333333333', date '2021-11-08'
+  'Sales', 'sharon@irssoftware.test', date '2021-11-08'
 );
 
 select public.seed_account(
   '99999999-9999-9999-9999-999999999999', 'kumar@irssoftware.test',
   'Kumaravel A/L Subramaniam', 'Sales Consultant', 'staff',
-  'dddddddd-0000-0000-0000-000000000002',
-  '33333333-3333-3333-3333-333333333333', date '2023-03-20'
+  'Sales', 'sharon@irssoftware.test', date '2023-03-20'
 );
 
 -- Support also reports to Sharon.
 select public.seed_account(
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'jasmine@irssoftware.test',
   'Jasmine Chong Mei Yee', 'Support Specialist', 'staff',
-  'dddddddd-0000-0000-0000-000000000003',
-  '33333333-3333-3333-3333-333333333333', date '2022-07-04'
+  'Support', 'sharon@irssoftware.test', date '2022-07-04'
 );
 
 select public.seed_account(
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'hafiz@irssoftware.test',
   'Ahmad Hafiz Bin Ismail', 'Support Engineer', 'staff',
-  'dddddddd-0000-0000-0000-000000000003',
-  '33333333-3333-3333-3333-333333333333', date '2023-10-02'
+  'Support', 'sharon@irssoftware.test', date '2023-10-02'
 );
 
 -- ---------------------------------------------------------------------------
@@ -1020,39 +1081,45 @@ select public.seed_account(
 -- explicitly at the end of this file.
 create table public.seed_people (
   idx int,
-  id uuid,
+  id integer,
   base_minutes int,
   catalogue text
 );
 
-insert into public.seed_people (idx, id, base_minutes, catalogue) values
-  (0, '22222222-2222-2222-2222-222222222222', 300, 'lead'),
-  (1, '33333333-3333-3333-3333-333333333333', 285, 'lead'),
-  (2, '44444444-4444-4444-4444-444444444444', 330, 'engineering'),
-  (3, '55555555-5555-5555-5555-555555555555', 255, 'engineering'),
-  (4, '66666666-6666-6666-6666-666666666666', 195, 'engineering'),
-  (5, '77777777-7777-7777-7777-777777777777', 150, 'engineering'),
-  (6, '88888888-8888-8888-8888-888888888888', 270, 'sales'),
-  (7, '99999999-9999-9999-9999-999999999999', 165, 'sales'),
-  (8, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 240, 'support'),
-  (9, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 135, 'support');
-
--- HR records training of its own too.
-insert into public.seed_people (idx, id, base_minutes, catalogue) values
-  (10, '11111111-1111-1111-1111-111111111111', 225, 'lead');
+-- idx drives the deterministic variance below, so it is stated here rather than
+-- taken from users.id: the shape of the demo data must not depend on the order
+-- the database happened to assign keys in.
+insert into public.seed_people (idx, id, base_minutes, catalogue)
+select v.idx, u.id, v.base_minutes, v.catalogue
+  from (values
+    (0,  'faizal@irssoftware.test',  300, 'lead'),
+    (1,  'sharon@irssoftware.test',  285, 'lead'),
+    (2,  'aiman@irssoftware.test',   330, 'engineering'),
+    (3,  'preetha@irssoftware.test', 255, 'engineering'),
+    (4,  'wenjie@irssoftware.test',  195, 'engineering'),
+    (5,  'syafiq@irssoftware.test',  150, 'engineering'),
+    (6,  'nadia@irssoftware.test',   270, 'sales'),
+    (7,  'kumar@irssoftware.test',   165, 'sales'),
+    (8,  'jasmine@irssoftware.test', 240, 'support'),
+    (9,  'hafiz@irssoftware.test',   135, 'support'),
+    -- HR records training of its own too.
+    (10, 'hr@irssoftware.test',      225, 'lead')
+  ) as v (idx, email, base_minutes, catalogue)
+  join public.users u on u.email = v.email;
 
 do $$
 declare
   person record;
+  v_hr integer;
   v_year int;
   v_month int;
   v_status public.submission_status;
   v_nil boolean;
   v_minutes int;
-  v_submission uuid;
+  v_submission integer;
   v_submitted timestamptz;
   v_late boolean;
-  v_hod uuid;
+  v_hod integer;
   v_entry_count int;
   v_entry int;
   v_entry_minutes int;
@@ -1066,6 +1133,8 @@ declare
   v_effectiveness public.training_effectiveness;
   v_variance int;
 begin
+  select id into v_hr from public.users where email = 'hr@irssoftware.test';
+
   for person in select * from public.seed_people order by idx loop
 
     select hod_id into v_hod from public.users where id = person.id;
@@ -1202,7 +1271,7 @@ begin
           end,
           case
             when v_status in ('approved', 'rejected')
-            then '11111111-1111-1111-1111-111111111111'::uuid
+            then v_hr
           end,
           case
             when v_status in ('approved', 'rejected') then v_submitted + interval '4 days'
@@ -1279,13 +1348,14 @@ $$;
 
 do $$
 declare
-  v_submission uuid;
+  v_submission integer;
   v_next_seq int;
 begin
-  select id into v_submission
-    from public.training_submissions
-   where employee_id = '44444444-4444-4444-4444-444444444444'
-     and month = 2 and year = 2026;
+  select s.id into v_submission
+    from public.training_submissions s
+    join public.users u on u.id = s.employee_id
+   where u.email = 'aiman@irssoftware.test'
+     and s.month = 2 and s.year = 2026;
 
   if v_submission is null then
     return;
@@ -1318,13 +1388,14 @@ $$;
 -- A second override, so the reviewer view is exercised for more than one person.
 do $$
 declare
-  v_submission uuid;
+  v_submission integer;
   v_next_seq int;
 begin
-  select id into v_submission
-    from public.training_submissions
-   where employee_id = '88888888-8888-8888-8888-888888888888'
-     and month = 4 and year = 2026;
+  select s.id into v_submission
+    from public.training_submissions s
+    join public.users u on u.id = s.employee_id
+   where u.email = 'nadia@irssoftware.test'
+     and s.month = 4 and s.year = 2026;
 
   if v_submission is null then
     return;
@@ -1387,5 +1458,5 @@ where s.status <> 'draft';
 drop table public.seed_people;
 
 drop function public.seed_account(
-  uuid, text, text, text, public.user_role, uuid, uuid, date
+  uuid, text, text, text, public.user_role, text, text, date
 );

@@ -31,12 +31,12 @@ export function SubmissionFilters({
 }: {
   month: number | null;
   year: number | null;
-  departmentId: string | null;
+  departmentId: number | null;
   status: SubmissionStatus | null;
-  employeeId: string | null;
+  employeeId: number | null;
   years: number[];
-  departments: { id: string; name: string }[];
-  employees: { id: string; full_name: string }[];
+  departments: { id: number; name: string }[];
+  employees: { id: number; full_name: string }[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -105,7 +105,7 @@ export function SubmissionFilters({
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Department</Label>
         <Select
-          value={departmentId ?? ALL}
+          value={departmentId === null ? ALL : String(departmentId)}
           onValueChange={(value) => setParam("department", value)}
         >
           <SelectTrigger className="w-[190px]">
@@ -114,7 +114,7 @@ export function SubmissionFilters({
           <SelectContent>
             <SelectItem value={ALL}>All departments</SelectItem>
             {departments.map((department) => (
-              <SelectItem key={department.id} value={department.id}>
+              <SelectItem key={department.id} value={String(department.id)}>
                 {department.name}
               </SelectItem>
             ))}
@@ -145,7 +145,7 @@ export function SubmissionFilters({
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Employee</Label>
         <Select
-          value={employeeId ?? ALL}
+          value={employeeId === null ? ALL : String(employeeId)}
           onValueChange={(value) => setParam("employee", value)}
         >
           <SelectTrigger className="w-[200px]">
@@ -154,7 +154,7 @@ export function SubmissionFilters({
           <SelectContent>
             <SelectItem value={ALL}>All employees</SelectItem>
             {employees.map((employee) => (
-              <SelectItem key={employee.id} value={employee.id}>
+              <SelectItem key={employee.id} value={String(employee.id)}>
                 {employee.full_name}
               </SelectItem>
             ))}

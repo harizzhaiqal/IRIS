@@ -31,9 +31,10 @@ create schema public;
 grant usage on schema public to anon, authenticated, service_role;
 grant all on schema public to postgres;
 
--- Pinned to the extensions schema so the drop above can never take them with
--- it. Supabase preinstalls both, making these no-ops on a fresh project.
-create extension if not exists "uuid-ossp" with schema extensions;
+-- Pinned to the extensions schema so the drop above can never take it with it.
+-- Supabase preinstalls pgcrypto, making this a no-op on a fresh project. The
+-- seed needs it for crypt() and gen_salt(); nothing needs uuid-ossp any more,
+-- because every key in the schema is a generated integer.
 create extension if not exists pgcrypto with schema extensions;
 
 set search_path = public, extensions;

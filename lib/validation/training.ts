@@ -11,8 +11,8 @@ export const periodSchema = z.object({
 
 export const trainingEntrySchema = z
   .object({
-    // Coerced: this arrives as a string from the ?edit= query param and from
-    // form data, but the column is a bigint identity.
+    // Coerced: this arrives as a string from the ?recordId= query param and
+    // from form data, but the column is an integer identity.
     recordId: z.coerce.number().int().positive().optional(),
     month: z.number().int().min(1).max(12),
     year: z.number().int().min(2000).max(2100),
@@ -152,9 +152,14 @@ export const attachmentSchema = z.object({
   fileSize: z.number().int().min(0),
 });
 
+/** An attachment id from a route segment, so a hand-edited path is rejected. */
+export const idParamSchema = z.coerce.number().int().positive();
+
 export const reviewDecisionSchema = z
   .object({
-    submissionId: z.string().uuid(),
+    // Coerced for the same reason as recordId: the review page passes the id
+    // through the URL, where everything is a string.
+    submissionId: z.coerce.number().int().positive(),
     decision: z.enum(["verify", "return", "approve", "reject"]),
     comment: z.string().trim().max(1000).nullish(),
   })

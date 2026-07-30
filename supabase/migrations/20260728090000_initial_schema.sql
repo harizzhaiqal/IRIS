@@ -1,7 +1,11 @@
 -- IRIS: Employee Training Records module — core schema.
 -- Replaces form IRS-HR-F14 (Employee Training Record & Evaluation).
-
-create extension if not exists "uuid-ossp";
+--
+-- Every table in this schema keys on `id integer generated always as identity`,
+-- so ids read 1, 2, 3, 4. The one uuid left in the design is
+-- users.auth_user_id: it points at auth.users, which Supabase Auth owns and
+-- keys by uuid, so that column carries the credential link while public.users
+-- keeps its own integer key.
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -32,21 +36,24 @@ create type public.training_effectiveness as enum (
 -- ---------------------------------------------------------------------------
 
 create table public.departments (
-  id uuid primary key default uuid_generate_v4(),
+  id integer primary key generated always as identity,
   name text not null unique,
-  hod_id uuid,
+  hod_id integer,
   created_time timestamptz not null default now()
 );
 
 create table public.users (
-  id uuid primary key references auth.users (id) on delete cascade,
+  id integer primary key generated always as identity,
+  -- The Supabase Auth account behind this person. auth.users is GoTrue's table
+  -- and keys by uuid, so the link is a uuid even though this table is not.
+  auth_user_id uuid not null unique references auth.users (id) on delete cascade,
   full_name text not null,
   email text not null unique,
   designation text,
   date_joined date,
   role public.user_role not null default 'staff',
-  department_id uuid references public.departments (id) on delete set null,
-  hod_id uuid references public.users (id) on delete set null,
+  department_id integer references public.departments (id) on delete set null,
+  hod_id integer references public.users (id) on delete set null,
   is_active boolean not null default true,
   created_time timestamptz not null default now()
 );
@@ -55,6 +62,8 @@ alter table public.departments
   add constraint departments_hod_id_fkey
   foreign key (hod_id) references public.users (id) on delete set null;
 
+-- Every request resolves auth.uid() to this row, so the lookup is indexed by
+-- the unique constraint above; these cover the reporting-line queries.
 create index users_department_id_idx on public.users (department_id);
 create index users_hod_id_idx on public.users (hod_id);
 create index users_role_idx on public.users (role);
@@ -67,38 +76,40 @@ create index users_role_idx on public.users (role);
 -- ---------------------------------------------------------------------------
 
 create table public.app_settings (
-  id boolean primary key default true,
+  id integer primary key default 1,
   monthly_standard_hours integer not null default 4,
   yearly_standard_hours integer not null default 48,
   yearly_threshold_hours integer not null default 36,
   submission_deadline_day integer not null default 10,
   reminder_enabled boolean not null default true,
-  updated_by uuid references public.users (id) on delete set null,
+  updated_by integer references public.users (id) on delete set null,
   modified_time timestamptz not null default now(),
-  constraint app_settings_single_row check (id),
+  -- Not an identity column: the row is a singleton, so the key is pinned to 1
+  -- rather than counting upward.
+  constraint app_settings_single_row check (id = 1),
   constraint app_settings_deadline_day_valid
     check (submission_deadline_day between 1 and 28)
 );
 
-insert into public.app_settings (id) values (true);
+insert into public.app_settings (id) values (1);
 
 -- ---------------------------------------------------------------------------
 -- Training submissions — one per employee per month.
 -- ---------------------------------------------------------------------------
 
 create table public.training_submissions (
-  id uuid primary key default uuid_generate_v4(),
-  employee_id uuid not null references public.users (id) on delete cascade,
+  id integer primary key generated always as identity,
+  employee_id integer not null references public.users (id) on delete cascade,
   month integer not null check (month between 1 and 12),
   year integer not null check (year between 2000 and 2100),
   status public.submission_status not null default 'draft',
   is_nil_return boolean not null default false,
   submitted_at timestamptz,
   is_late boolean not null default false,
-  hod_verified_by uuid references public.users (id) on delete set null,
+  hod_verified_by integer references public.users (id) on delete set null,
   hod_verified_at timestamptz,
   hod_comment text,
-  hr_verified_by uuid references public.users (id) on delete set null,
+  hr_verified_by integer references public.users (id) on delete set null,
   hr_verified_at timestamptz,
   hr_comment text,
   total_minutes integer not null default 0,
@@ -127,8 +138,8 @@ create index training_submissions_status_idx
 -- numbers the entries within one month, which is what the paper form shows in
 -- its "No." column and what reviewers read down the page.
 create table public.training_records (
-  id bigint primary key generated always as identity,
-  submission_id uuid not null
+  id integer primary key generated always as identity,
+  submission_id integer not null
     references public.training_submissions (id) on delete cascade,
   seq_no integer not null default 1,
   title text not null,
@@ -159,8 +170,8 @@ create index training_records_submission_idx
 -- ---------------------------------------------------------------------------
 
 create table public.training_attachments (
-  id uuid primary key default uuid_generate_v4(),
-  training_record_id bigint not null
+  id integer primary key generated always as identity,
+  training_record_id integer not null
     references public.training_records (id) on delete cascade,
   file_path text not null,
   file_name text not null,
@@ -176,14 +187,15 @@ create index training_attachments_record_idx
 -- ---------------------------------------------------------------------------
 
 create table public.automation_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id integer primary key generated always as identity,
   action_type text not null,
   description text,
   related_table text,
-  -- text, not uuid: the log points at whichever table the action touched, and
-  -- those no longer share a key type now that training_records uses a bigint.
-  related_id text,
-  performed_by uuid references public.users (id) on delete set null,
+  -- integer, not text: the log points at whichever table the action touched,
+  -- and every table in this schema now keys on integer, so one column type
+  -- covers them all. related_table says which table the id belongs to.
+  related_id integer,
+  performed_by integer references public.users (id) on delete set null,
   is_system boolean not null default false,
   created_time timestamptz not null default now()
 );
@@ -224,7 +236,7 @@ security definer
 set search_path = public
 as $$
 declare
-  target_submission uuid := coalesce(new.submission_id, old.submission_id);
+  target_submission integer := coalesce(new.submission_id, old.submission_id);
 begin
   update public.training_submissions
      set total_minutes = coalesce(
