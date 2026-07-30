@@ -12,7 +12,9 @@
     "test:sql": "node supabase/tests/verify-sql.mjs",
     "types:generate": "supabase gen types typescript --local > lib/supabase/database.types.ts",
     "sql:bundle": "node scripts/bundle-sql.mjs",
-    "test:bundle": "node supabase/tests/verify-bundle.mjs"
+    "test:bundle": "node supabase/tests/verify-bundle.mjs",
+    "sql:repair": "node scripts/build-repair-sql.mjs",
+    "test:repair": "node supabase/tests/verify-repair.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",

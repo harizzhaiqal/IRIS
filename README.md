@@ -176,6 +176,7 @@ the multi-day override case described above.
 npm test            # unit tests for the duration and target maths
 npm run test:sql    # migrations, seed, triggers, and RLS against a real Postgres
 npm run test:bundle # supabase/setup.sql applies cleanly and is safe to re-run
+npm run test:repair # supabase/repair.sql fixes a broken database without data loss
 npm run build       # type check and production build
 ```
 
@@ -190,6 +191,26 @@ whole submit → return → resubmit → verify → approve lifecycle.
 `test:bundle` applies `supabase/setup.sql` twice, checking that the demo data
 lands correctly the first time and that a second run leaves identical row counts
 rather than duplicate accounts.
+
+`test:repair` builds a healthy database, breaks it exactly as a dashboard rename
+does, and asserts `supabase/repair.sql` restores it without losing a row.
+
+### Fixing a live database without losing data
+
+`setup.sql` rebuilds: it drops the `public` schema and reseeds, which erases
+everything entered since. Most breakage does not need that. Renaming or altering
+something through the Supabase dashboard leaves the tables intact but strands the
+functions, because Postgres stores function bodies as text and never rewrites
+them on rename — which is what produces errors like
+`relation "public.profiles" does not exist`.
+
+Paste [`supabase/repair.sql`](supabase/repair.sql) instead. It re-applies every
+function, policy, trigger and grant, creates no tables and writes no rows, and is
+safe to run repeatedly. Regenerate it after changing a migration:
+
+```bash
+npm run sql:repair
+```
 
 ## Project layout
 
@@ -214,7 +235,8 @@ lib/
 supabase/
   migrations/            schema, RLS policies, workflow triggers
   seed.sql               demo data
-  setup.sql              generated: migrations + seed as one paste for hosted Supabase
+  setup.sql              generated: migrations + seed as one paste — REBUILDS, erases data
+  repair.sql             generated: functions, policies and grants only — keeps data
   tests/verify-sql.mjs   SQL verification harness
   tests/verify-bundle.mjs  checks setup.sql applies and re-applies cleanly
 scripts/bundle-sql.mjs   regenerates setup.sql — npm run sql:bundle
@@ -242,8 +264,14 @@ projects break.
 
 `public.users` holds the staff directory: name, designation, role, department
 and reporting line. It is distinct from `auth.users`, the Supabase Auth table
-that owns credentials. The two share a primary key, and `public.users.id`
-references `auth.users(id)`. No password is stored in `public.users`.
+that owns credentials. No password is stored in `public.users`.
+
+Every table in the application schema keys on `id integer generated always as
+identity`, so ids read 1, 2, 3, 4. The one exception is the link to Supabase
+Auth: `auth.users` is keyed by uuid, so `public.users.auth_user_id` is a uuid
+referencing `auth.users(id)` while `public.users.id` is the integer key the rest
+of the schema points at. `public.current_user_id()` resolves the uuid in the
+caller's JWT to that integer, and is the only place the two meet.
 
 `total_minutes` is recomputed by the database on every write and cannot be forged
 from a client. The service-role key is used only in `lib/automationLog.ts` and
