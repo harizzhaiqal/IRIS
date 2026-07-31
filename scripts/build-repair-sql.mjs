@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const SOURCES = [
   "supabase/migrations/20260728090000_initial_schema.sql",
   "supabase/migrations/20260728090100_rls_policies.sql",
+  "supabase/migrations/20260730120000_requests.sql",
 ];
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");

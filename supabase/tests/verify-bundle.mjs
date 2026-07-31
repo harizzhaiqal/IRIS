@@ -121,6 +121,8 @@ async function applyBundle(label) {
     "departments",
     "training_submissions",
     "training_records",
+    "requests",
+    "request_comments",
   ]) {
     const { rows } = await db.query(`select count(*)::int as n from public.${table}`);
     counts[table] = rows[0].n;
@@ -139,6 +141,8 @@ check("3 departments seeded", first.departments === 3, `got ${first.departments}
 check("submissions seeded", first.training_submissions > 50, `got ${first.training_submissions}`);
 check("training entries seeded", first.training_records > 100, `got ${first.training_records}`);
 check("11 auth accounts created", first.auth_users === 11, `got ${first.auth_users}`);
+check("10 demo requests seeded", first.requests === 10, `got ${first.requests}`);
+check("request comments seeded", first.request_comments >= 3, `got ${first.request_comments}`);
 
 const second = await applyBundle("Second run (re-run over existing data)");
 

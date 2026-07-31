@@ -879,6 +879,317 @@ alter default privileges in schema public
 
 
 -- ===========================================================================
+-- SOURCE: supabase/migrations/20260730120000_requests.sql
+-- ===========================================================================
+
+-- IRIS: Request Management — prototype module.
+--
+-- Replaces the informal chat/email route for asking the company for equipment,
+-- office items, and support. Deliberately smaller than Training Records: one
+-- table for the request, one for its comments, and a single review stage.
+
+-- ---------------------------------------------------------------------------
+-- Enums
+-- ---------------------------------------------------------------------------
+
+create type public.request_status as enum (
+  'submitted',
+  'pending_approval',
+  'approved',
+  'rejected',
+  'in_progress',
+  'completed'
+);
+
+create type public.request_category as enum (
+  'it_equipment',
+  'office_furniture',
+  'software',
+  'access_card',
+  'name_card',
+  'office_equipment',
+  'maintenance',
+  'other'
+);
+
+create type public.request_priority as enum ('low', 'normal', 'high', 'urgent');
+
+-- ---------------------------------------------------------------------------
+-- Requests
+--
+-- estimated_cost_cents is an integer for the same reason durations are integer
+-- minutes: money in a float eventually reports a total nobody can reconcile.
+-- Formatted to currency only at the display layer.
+--
+-- ai_suggestion keeps what the assistant proposed even after the requester
+-- edits the fields, so a reviewer can see what was suggested and what was
+-- actually chosen.
+-- ---------------------------------------------------------------------------
+
+create table public.requests (
+  id integer primary key generated always as identity,
+  requester_id integer not null references public.users (id) on delete cascade,
+  title text not null,
+  description text not null,
+  category public.request_category not null default 'other',
+  estimated_cost_cents integer not null default 0
+    check (estimated_cost_cents >= 0),
+  attachment_path text,
+  attachment_name text,
+  priority public.request_priority not null default 'normal',
+  assigned_department text,
+  approval_required boolean not null default true,
+  status public.request_status not null default 'submitted',
+  ai_suggestion jsonb,
+  reviewed_by integer references public.users (id) on delete set null,
+  reviewed_at timestamptz,
+  review_comment text,
+  created_time timestamptz not null default now(),
+  modified_time timestamptz not null default now(),
+  constraint requests_title_not_blank check (length(btrim(title)) > 0),
+  constraint requests_description_not_blank check (length(btrim(description)) > 0),
+  -- A decision must record who made it, and rejection must be explained.
+  constraint requests_decision_has_reviewer check (
+    status not in ('approved', 'rejected')
+    or (reviewed_by is not null and reviewed_at is not null)
+  ),
+  constraint requests_rejection_needs_comment check (
+    status <> 'rejected'
+    or (review_comment is not null and length(btrim(review_comment)) > 0)
+  )
+);
+
+create index requests_requester_idx on public.requests (requester_id);
+create index requests_status_idx on public.requests (status);
+create index requests_category_idx on public.requests (category);
+create index requests_priority_idx on public.requests (priority);
+create index requests_created_idx on public.requests (created_time desc);
+
+-- ---------------------------------------------------------------------------
+-- Comments — the conversation a request accumulates while it is handled.
+-- ---------------------------------------------------------------------------
+
+create table public.request_comments (
+  id integer primary key generated always as identity,
+  request_id integer not null references public.requests (id) on delete cascade,
+  author_id integer not null references public.users (id) on delete cascade,
+  body text not null,
+  created_time timestamptz not null default now(),
+  constraint request_comments_body_not_blank check (length(btrim(body)) > 0)
+);
+
+create index request_comments_request_idx
+  on public.request_comments (request_id, created_time);
+
+create trigger requests_touch_modified_time
+  before update on public.requests
+  for each row execute function public.touch_modified_time();
+
+-- ---------------------------------------------------------------------------
+-- Visibility helper
+--
+-- Defined once and reused by the comment policies, so the rule for "may I see
+-- this request" lives in exactly one place. security definer for the same
+-- reason as the training helpers: it must read users without re-entering the
+-- policies that call it.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.can_view_request(request integer)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+      from public.requests r
+     where r.id = request
+       and (
+         r.requester_id = public.current_user_id()
+         or public.is_hr_admin()
+         or public.is_my_team_member(r.requester_id)
+       )
+  );
+$$;
+
+revoke execute on function public.can_view_request(integer) from public;
+grant execute on function public.can_view_request(integer) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Row level security
+-- ---------------------------------------------------------------------------
+
+alter table public.requests enable row level security;
+alter table public.request_comments enable row level security;
+
+-- A requester sees their own; a HOD sees their team's; HR sees everything.
+create policy requests_select_own on public.requests
+  for select to authenticated
+  using (requester_id = public.current_user_id());
+
+create policy requests_select_team on public.requests
+  for select to authenticated
+  using (public.is_my_team_member(requester_id));
+
+create policy requests_select_hr on public.requests
+  for select to authenticated
+  using (public.is_hr_admin());
+
+-- Staff raise their own requests, and only in an opening state. Approving your
+-- own request by choosing the status on insert is what this forbids.
+create policy requests_insert_own on public.requests
+  for insert to authenticated
+  with check (
+    requester_id = public.current_user_id()
+    and status in ('submitted', 'pending_approval')
+  );
+
+-- The requester may still correct a request nobody has picked up yet. Which
+-- columns they may touch is limited by enforce_request_update_rules.
+create policy requests_update_own on public.requests
+  for update to authenticated
+  using (
+    requester_id = public.current_user_id()
+    and status in ('submitted', 'pending_approval')
+  )
+  with check (requester_id = public.current_user_id());
+
+-- Reviewers act on requests they can see. The trigger below limits them to the
+-- review columns and stops anyone reviewing their own request.
+create policy requests_update_reviewer on public.requests
+  for update to authenticated
+  using (public.is_hr_admin() or public.is_my_team_member(requester_id))
+  with check (public.is_hr_admin() or public.is_my_team_member(requester_id));
+
+-- Comments follow the request: if you can see it, you can read and add them.
+create policy request_comments_select on public.request_comments
+  for select to authenticated
+  using (public.can_view_request(request_id));
+
+create policy request_comments_insert on public.request_comments
+  for insert to authenticated
+  with check (
+    author_id = public.current_user_id()
+    and public.can_view_request(request_id)
+  );
+
+-- ---------------------------------------------------------------------------
+-- Update rules
+--
+-- The policies above decide who may write. This decides what they may write,
+-- which is the part a policy cannot express: a requester editing their own
+-- request must not be able to approve it, and a reviewer must not be able to
+-- rewrite the request they are judging.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.enforce_request_update_rules()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor integer := public.current_user_id();
+  is_owner boolean := old.requester_id = actor;
+  is_reviewer boolean := public.is_hr_admin()
+    or public.is_my_team_member(old.requester_id);
+begin
+  -- Nobody decides on their own request, whatever role they hold.
+  if is_owner and new.status is distinct from old.status
+     and new.status in ('approved', 'rejected') then
+    raise exception 'A request cannot be approved or rejected by the person who raised it';
+  end if;
+
+  if is_owner and not is_reviewer then
+    -- The requester may revise the request itself, never the verdict.
+    if new.status is distinct from old.status
+       and new.status not in ('submitted', 'pending_approval') then
+      raise exception 'A requester may not move their request beyond approval';
+    end if;
+
+    new.reviewed_by := old.reviewed_by;
+    new.reviewed_at := old.reviewed_at;
+    new.review_comment := old.review_comment;
+    return new;
+  end if;
+
+  if is_reviewer then
+    -- Reviewers judge; they do not rewrite what they are judging.
+    new.title := old.title;
+    new.description := old.description;
+    new.requester_id := old.requester_id;
+    new.estimated_cost_cents := old.estimated_cost_cents;
+    new.attachment_path := old.attachment_path;
+    new.attachment_name := old.attachment_name;
+    new.ai_suggestion := old.ai_suggestion;
+
+    -- A decision stamps itself, so no client can post-date or misattribute one.
+    if new.status is distinct from old.status
+       and new.status in ('approved', 'rejected') then
+      new.reviewed_by := actor;
+      new.reviewed_at := now();
+    end if;
+
+    return new;
+  end if;
+
+  raise exception 'Not permitted to change this request';
+end;
+$$;
+
+create trigger requests_enforce_update_rules
+  before update on public.requests
+  for each row execute function public.enforce_request_update_rules();
+
+-- ---------------------------------------------------------------------------
+-- Privileges. Stated explicitly for the same reason as the training tables:
+-- default privileges are a property of the schema and do not survive a rebuild.
+-- ---------------------------------------------------------------------------
+
+grant select, insert, update, delete on public.requests to authenticated;
+grant select, insert, update, delete on public.request_comments to authenticated;
+grant all on public.requests to service_role;
+grant all on public.request_comments to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Storage: optional proof attached to a request.
+--
+-- Same path convention as training attachments — <requester_id>/<file> — so the
+-- owner check stays a prefix comparison on the first segment.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('request-attachments', 'request-attachments', false)
+on conflict (id) do nothing;
+
+create policy request_attachments_storage_select on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'request-attachments'
+    and (
+      public.storage_path_owner(name) = public.current_user_id()
+      or public.is_hr_admin()
+      or public.is_my_team_member(public.storage_path_owner(name))
+    )
+  );
+
+create policy request_attachments_storage_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'request-attachments'
+    and public.storage_path_owner(name) = public.current_user_id()
+  );
+
+create policy request_attachments_storage_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'request-attachments'
+    and public.storage_path_owner(name) = public.current_user_id()
+  );
+
+
+-- ===========================================================================
 -- SOURCE: supabase/seed.sql
 -- ===========================================================================
 
@@ -1460,3 +1771,138 @@ drop table public.seed_people;
 drop function public.seed_account(
   uuid, text, text, text, public.user_role, text, text, date
 );
+
+-- ---------------------------------------------------------------------------
+-- Requests — prototype module demo data.
+--
+-- Ten requests spanning every status, category and priority, so the list
+-- filters and the dashboard tiles have a real spread to show. Costs are stored
+-- in cents: RM 890.00 is 89000.
+-- ---------------------------------------------------------------------------
+
+insert into public.requests (
+  requester_id, title, description, category, estimated_cost_cents,
+  attachment_name, priority, assigned_department, approval_required, status,
+  ai_suggestion, reviewed_by, reviewed_at, review_comment, created_time
+) values
+  ((select id from public.users where email = 'aiman@irssoftware.test'),
+   'Second monitor for development work',
+   'I need a new monitor because my current monitor is too small for reviewing code side by side.',
+   'it_equipment', 89000, null, 'normal', 'IT', true, 'approved',
+   '{"category":"it_equipment","department":"IT","priority":"normal","approvalRequired":true,"reason":"Equipment purchase usually requires manager or admin approval."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '26 days', 'Approved. Collect from the IT store room.',
+   now() - interval '28 days'),
+
+  ((select id from public.users where email = 'preetha@irssoftware.test'),
+   'Laptop will not power on',
+   'My laptop is broken and will not start, I cannot work until it is repaired.',
+   'it_equipment', 0, 'fault-report.pdf', 'urgent', 'IT', true, 'completed',
+   '{"category":"it_equipment","department":"IT","priority":"urgent","approvalRequired":true,"reason":"Wording suggests work is blocked, so this is raised as urgent."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '20 days', 'Replacement unit issued while the board is repaired.',
+   now() - interval '21 days'),
+
+  ((select id from public.users where email = 'wenjie@irssoftware.test'),
+   'Ergonomic chair replacement',
+   'My chair is damaged and the back support no longer holds position.',
+   'office_furniture', 65000, null, 'high', 'Admin', true, 'in_progress',
+   '{"category":"office_furniture","department":"Admin","priority":"high","approvalRequired":true,"reason":"Replacement of damaged furniture is treated as high priority."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '9 days', 'Approved, waiting on the supplier delivery.',
+   now() - interval '12 days'),
+
+  ((select id from public.users where email = 'syafiq@irssoftware.test'),
+   'JetBrains licence for backend work',
+   'Please install and license the JetBrains IDE on my workstation.',
+   'software', 74000, null, 'normal', 'IT', true, 'pending_approval',
+   '{"category":"software","department":"IT","priority":"normal","approvalRequired":true,"reason":"Software licences are purchased centrally and need approval."}'::jsonb,
+   null, null, null, now() - interval '4 days'),
+
+  ((select id from public.users where email = 'nadia@irssoftware.test'),
+   'Name cards for client visits',
+   'I need business cards printed with my new designation for upcoming client visits.',
+   'name_card', 12000, null, 'normal', 'Admin', true, 'approved',
+   '{"category":"name_card","department":"Admin","priority":"normal","approvalRequired":true,"reason":"Printed stationery is ordered by Admin in batches."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '6 days', 'Approved, going out with the next print batch.',
+   now() - interval '8 days'),
+
+  ((select id from public.users where email = 'kumar@irssoftware.test'),
+   'Access card not opening the back door',
+   'My access card has stopped working on the rear entrance, I have an access issue every morning.',
+   'access_card', 0, null, 'high', 'Admin', false, 'in_progress',
+   '{"category":"access_card","department":"Admin","priority":"high","approvalRequired":false,"reason":"Access problems are handled directly by Admin without a purchase approval."}'::jsonb,
+   null, null, null, now() - interval '3 days'),
+
+  ((select id from public.users where email = 'jasmine@irssoftware.test'),
+   'Air conditioning in the support room',
+   'The aircond in the support area is not cooling and needs maintenance.',
+   'maintenance', 0, null, 'high', 'Facilities', false, 'submitted',
+   '{"category":"maintenance","department":"Facilities","priority":"high","approvalRequired":false,"reason":"Building maintenance is raised directly with Facilities."}'::jsonb,
+   null, null, null, now() - interval '1 day'),
+
+  ((select id from public.users where email = 'hafiz@irssoftware.test'),
+   'Standing desk converter',
+   'A standing desk converter would be nice to have for the afternoons.',
+   'office_furniture', 45000, null, 'low', 'Admin', true, 'rejected',
+   '{"category":"office_furniture","department":"Admin","priority":"low","approvalRequired":true,"reason":"Described as nice to have, so raised at low priority."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '14 days',
+   'Not in this quarter budget. Please raise again in the next cycle.',
+   now() - interval '16 days'),
+
+  ((select id from public.users where email = 'aiman@irssoftware.test'),
+   'Stationery for the sprint board',
+   'Whiteboard markers, sticky notes and index cards for the team planning wall.',
+   'office_equipment', 8500, null, 'low', 'Admin', false, 'completed',
+   '{"category":"office_equipment","department":"Admin","priority":"low","approvalRequired":false,"reason":"Low value consumables are handled by Admin without approval."}'::jsonb,
+   null, null, null, now() - interval '30 days'),
+
+  ((select id from public.users where email = 'faizal@irssoftware.test'),
+   'Printer in the meeting room jams constantly',
+   'The meeting room printer jams on every second job and needs repair.',
+   'it_equipment', 0, null, 'high', 'IT', true, 'pending_approval',
+   '{"category":"it_equipment","department":"IT","priority":"high","approvalRequired":true,"reason":"Repair work is raised at high priority."}'::jsonb,
+   null, null, null, now() - interval '2 days');
+
+-- A short conversation on the requests still being handled.
+insert into public.request_comments (request_id, author_id, body, created_time)
+select r.id, (select id from public.users where email = 'hr@irssoftware.test'),
+       'Supplier quoted two weeks. I will update once it ships.',
+       now() - interval '8 days'
+  from public.requests r where r.title = 'Ergonomic chair replacement';
+
+insert into public.request_comments (request_id, author_id, body, created_time)
+select r.id, r.requester_id,
+       'Thank you. The current chair is usable in the meantime.',
+       now() - interval '7 days'
+  from public.requests r where r.title = 'Ergonomic chair replacement';
+
+insert into public.request_comments (request_id, author_id, body, created_time)
+select r.id, (select id from public.users where email = 'hr@irssoftware.test'),
+       'Raised with the building manager, they are attending this week.',
+       now() - interval '2 days'
+  from public.requests r where r.title = 'Access card not opening the back door';
+
+-- Matching audit trail, so the log is not empty for the requests module.
+insert into public.automation_logs (
+  action_type, description, related_table, related_id, performed_by,
+  is_system, created_time
+)
+select
+  case r.status
+    when 'approved' then 'request.approved'
+    when 'rejected' then 'request.rejected'
+    when 'in_progress' then 'request.in_progress'
+    when 'completed' then 'request.completed'
+    else 'request.submitted'
+  end,
+  format('%s — %s', u.full_name, r.title),
+  'requests',
+  r.id,
+  coalesce(r.reviewed_by, r.requester_id),
+  false,
+  coalesce(r.reviewed_at, r.created_time)
+from public.requests r
+join public.users u on u.id = r.requester_id;

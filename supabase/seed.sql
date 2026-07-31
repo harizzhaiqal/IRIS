@@ -576,3 +576,138 @@ drop table public.seed_people;
 drop function public.seed_account(
   uuid, text, text, text, public.user_role, text, text, date
 );
+
+-- ---------------------------------------------------------------------------
+-- Requests — prototype module demo data.
+--
+-- Ten requests spanning every status, category and priority, so the list
+-- filters and the dashboard tiles have a real spread to show. Costs are stored
+-- in cents: RM 890.00 is 89000.
+-- ---------------------------------------------------------------------------
+
+insert into public.requests (
+  requester_id, title, description, category, estimated_cost_cents,
+  attachment_name, priority, assigned_department, approval_required, status,
+  ai_suggestion, reviewed_by, reviewed_at, review_comment, created_time
+) values
+  ((select id from public.users where email = 'aiman@irssoftware.test'),
+   'Second monitor for development work',
+   'I need a new monitor because my current monitor is too small for reviewing code side by side.',
+   'it_equipment', 89000, null, 'normal', 'IT', true, 'approved',
+   '{"category":"it_equipment","department":"IT","priority":"normal","approvalRequired":true,"reason":"Equipment purchase usually requires manager or admin approval."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '26 days', 'Approved. Collect from the IT store room.',
+   now() - interval '28 days'),
+
+  ((select id from public.users where email = 'preetha@irssoftware.test'),
+   'Laptop will not power on',
+   'My laptop is broken and will not start, I cannot work until it is repaired.',
+   'it_equipment', 0, 'fault-report.pdf', 'urgent', 'IT', true, 'completed',
+   '{"category":"it_equipment","department":"IT","priority":"urgent","approvalRequired":true,"reason":"Wording suggests work is blocked, so this is raised as urgent."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '20 days', 'Replacement unit issued while the board is repaired.',
+   now() - interval '21 days'),
+
+  ((select id from public.users where email = 'wenjie@irssoftware.test'),
+   'Ergonomic chair replacement',
+   'My chair is damaged and the back support no longer holds position.',
+   'office_furniture', 65000, null, 'high', 'Admin', true, 'in_progress',
+   '{"category":"office_furniture","department":"Admin","priority":"high","approvalRequired":true,"reason":"Replacement of damaged furniture is treated as high priority."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '9 days', 'Approved, waiting on the supplier delivery.',
+   now() - interval '12 days'),
+
+  ((select id from public.users where email = 'syafiq@irssoftware.test'),
+   'JetBrains licence for backend work',
+   'Please install and license the JetBrains IDE on my workstation.',
+   'software', 74000, null, 'normal', 'IT', true, 'pending_approval',
+   '{"category":"software","department":"IT","priority":"normal","approvalRequired":true,"reason":"Software licences are purchased centrally and need approval."}'::jsonb,
+   null, null, null, now() - interval '4 days'),
+
+  ((select id from public.users where email = 'nadia@irssoftware.test'),
+   'Name cards for client visits',
+   'I need business cards printed with my new designation for upcoming client visits.',
+   'name_card', 12000, null, 'normal', 'Admin', true, 'approved',
+   '{"category":"name_card","department":"Admin","priority":"normal","approvalRequired":true,"reason":"Printed stationery is ordered by Admin in batches."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '6 days', 'Approved, going out with the next print batch.',
+   now() - interval '8 days'),
+
+  ((select id from public.users where email = 'kumar@irssoftware.test'),
+   'Access card not opening the back door',
+   'My access card has stopped working on the rear entrance, I have an access issue every morning.',
+   'access_card', 0, null, 'high', 'Admin', false, 'in_progress',
+   '{"category":"access_card","department":"Admin","priority":"high","approvalRequired":false,"reason":"Access problems are handled directly by Admin without a purchase approval."}'::jsonb,
+   null, null, null, now() - interval '3 days'),
+
+  ((select id from public.users where email = 'jasmine@irssoftware.test'),
+   'Air conditioning in the support room',
+   'The aircond in the support area is not cooling and needs maintenance.',
+   'maintenance', 0, null, 'high', 'Facilities', false, 'submitted',
+   '{"category":"maintenance","department":"Facilities","priority":"high","approvalRequired":false,"reason":"Building maintenance is raised directly with Facilities."}'::jsonb,
+   null, null, null, now() - interval '1 day'),
+
+  ((select id from public.users where email = 'hafiz@irssoftware.test'),
+   'Standing desk converter',
+   'A standing desk converter would be nice to have for the afternoons.',
+   'office_furniture', 45000, null, 'low', 'Admin', true, 'rejected',
+   '{"category":"office_furniture","department":"Admin","priority":"low","approvalRequired":true,"reason":"Described as nice to have, so raised at low priority."}'::jsonb,
+   (select id from public.users where email = 'hr@irssoftware.test'),
+   now() - interval '14 days',
+   'Not in this quarter budget. Please raise again in the next cycle.',
+   now() - interval '16 days'),
+
+  ((select id from public.users where email = 'aiman@irssoftware.test'),
+   'Stationery for the sprint board',
+   'Whiteboard markers, sticky notes and index cards for the team planning wall.',
+   'office_equipment', 8500, null, 'low', 'Admin', false, 'completed',
+   '{"category":"office_equipment","department":"Admin","priority":"low","approvalRequired":false,"reason":"Low value consumables are handled by Admin without approval."}'::jsonb,
+   null, null, null, now() - interval '30 days'),
+
+  ((select id from public.users where email = 'faizal@irssoftware.test'),
+   'Printer in the meeting room jams constantly',
+   'The meeting room printer jams on every second job and needs repair.',
+   'it_equipment', 0, null, 'high', 'IT', true, 'pending_approval',
+   '{"category":"it_equipment","department":"IT","priority":"high","approvalRequired":true,"reason":"Repair work is raised at high priority."}'::jsonb,
+   null, null, null, now() - interval '2 days');
+
+-- A short conversation on the requests still being handled.
+insert into public.request_comments (request_id, author_id, body, created_time)
+select r.id, (select id from public.users where email = 'hr@irssoftware.test'),
+       'Supplier quoted two weeks. I will update once it ships.',
+       now() - interval '8 days'
+  from public.requests r where r.title = 'Ergonomic chair replacement';
+
+insert into public.request_comments (request_id, author_id, body, created_time)
+select r.id, r.requester_id,
+       'Thank you. The current chair is usable in the meantime.',
+       now() - interval '7 days'
+  from public.requests r where r.title = 'Ergonomic chair replacement';
+
+insert into public.request_comments (request_id, author_id, body, created_time)
+select r.id, (select id from public.users where email = 'hr@irssoftware.test'),
+       'Raised with the building manager, they are attending this week.',
+       now() - interval '2 days'
+  from public.requests r where r.title = 'Access card not opening the back door';
+
+-- Matching audit trail, so the log is not empty for the requests module.
+insert into public.automation_logs (
+  action_type, description, related_table, related_id, performed_by,
+  is_system, created_time
+)
+select
+  case r.status
+    when 'approved' then 'request.approved'
+    when 'rejected' then 'request.rejected'
+    when 'in_progress' then 'request.in_progress'
+    when 'completed' then 'request.completed'
+    else 'request.submitted'
+  end,
+  format('%s — %s', u.full_name, r.title),
+  'requests',
+  r.id,
+  coalesce(r.reviewed_by, r.requester_id),
+  false,
+  coalesce(r.reviewed_at, r.created_time)
+from public.requests r
+join public.users u on u.id = r.requester_id;

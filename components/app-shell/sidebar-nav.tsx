@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ClipboardCheck,
+  Inbox,
   LayoutDashboard,
   NotebookPen,
   Users,
@@ -31,6 +32,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/training",
     label: "My training",
     icon: NotebookPen,
+    roles: ["staff", "hod", "hr_admin"],
+  },
+  {
+    href: "/requests",
+    label: "Requests",
+    icon: Inbox,
     roles: ["staff", "hod", "hr_admin"],
   },
   {

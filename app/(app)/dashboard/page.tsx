@@ -1,4 +1,5 @@
 import { HodDashboard } from "@/components/dashboard/hod-dashboard";
+import { RequestSummary } from "@/components/dashboard/request-summary";
 import { HrDashboard } from "@/components/dashboard/hr-dashboard";
 import { StaffDashboard } from "@/components/dashboard/staff-dashboard";
 import { requireProfile } from "@/lib/auth";
@@ -8,8 +9,18 @@ export const metadata = { title: "Dashboard — IRIS" };
 export default async function DashboardPage() {
   const profile = await requireProfile();
 
-  if (profile.role === "hr_admin") return <HrDashboard profile={profile} />;
-  if (profile.role === "hod") return <HodDashboard profile={profile} />;
+  const isReviewer = profile.role !== "staff";
 
-  return <StaffDashboard profile={profile} />;
+  // The training view stays whatever the role's own component renders; the
+  // Requests block is the same for everyone because its queries are already
+  // scoped by RLS.
+  return (
+    <div className="space-y-10">
+      {profile.role === "hr_admin" ? <HrDashboard profile={profile} /> : null}
+      {profile.role === "hod" ? <HodDashboard profile={profile} /> : null}
+      {profile.role === "staff" ? <StaffDashboard profile={profile} /> : null}
+
+      <RequestSummary isReviewer={isReviewer} />
+    </div>
+  );
 }

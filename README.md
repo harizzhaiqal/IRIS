@@ -1,8 +1,8 @@
 # IRIS — IRS Records and Insight System
 
 Internal staff workflow system for IRS Software Solution. This build covers the
-authentication shell, the role-aware dashboard, and the **Employee Training
-Records** module.
+authentication shell, the role-aware dashboard, the **Employee Training Records**
+module, and a prototype **Request Management** module.
 
 The module replaces form IRS-HR-F14 (*Employee Training Record & Evaluation*),
 which was previously an Excel workbook per employee per year, emailed to a head
@@ -173,7 +173,7 @@ the multi-day override case described above.
 ## Testing
 
 ```bash
-npm test            # unit tests for the duration and target maths
+npm test            # unit tests for the duration, target, and suggestion logic
 npm run test:sql    # migrations, seed, triggers, and RLS against a real Postgres
 npm run test:bundle # supabase/setup.sql applies cleanly and is safe to re-run
 npm run test:repair # supabase/repair.sql fixes a broken database without data loss
@@ -211,6 +211,49 @@ safe to run repeatedly. Regenerate it after changing a migration:
 ```bash
 npm run sql:repair
 ```
+
+## Request Management (prototype)
+
+A smaller module alongside Training Records, replacing the informal chat-and-email
+route for asking the company for equipment, office items, and support.
+
+Staff raise a request and follow it; a HOD sees their team's, HR sees everything.
+Reviewers approve or reject, then move a request through in progress to completed.
+A request needing approval opens as **pending approval**; one that does not goes
+straight to **submitted** for the handling team.
+
+| | |
+| --- | --- |
+| Pages | `/requests`, `/requests/new`, `/requests/[id]` |
+| Statuses | submitted, pending approval, approved, rejected, in progress, completed |
+| Categories | IT equipment, office furniture, software, access card, name card, office equipment, maintenance, other |
+| Priorities | low, normal, high, urgent |
+
+Costs are stored as **integer cents** and formatted only at the display layer, for
+the same reason durations are integer minutes.
+
+### Suggest with AI
+
+The new-request form reads the description and proposes a category, department,
+priority, whether approval is needed, and a short reason.
+
+It is deterministic keyword matching in
+[`lib/ai/suggestRequest.ts`](lib/ai/suggestRequest.ts), not a model call — no key
+to configure, nothing to rate-limit mid-demo, and the behaviour is pinned by unit
+tests rather than re-rolled on every run. It runs as a server action, so swapping
+in a real model later means changing one pure function and never puts a key in the
+browser bundle.
+
+Whatever it proposes is a suggestion: every field stays editable, and the request
+detail page shows what was suggested alongside anything the requester changed.
+
+### Adding it to a database that already has data
+
+The requests migration only creates things, so it is safe to apply on its own:
+
+Paste [`supabase/migrations/20260730120000_requests.sql`](supabase/migrations/20260730120000_requests.sql)
+into the SQL Editor. Your existing training data is untouched. Use `setup.sql`
+only if you also want the demo requests, and remember it rebuilds everything.
 
 ## Project layout
 

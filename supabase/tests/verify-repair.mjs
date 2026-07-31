@@ -71,6 +71,7 @@ console.log("  stubs installed");
 console.log("\n=== Build a healthy database ===");
 await db.exec(strip(read("supabase/migrations/20260728090000_initial_schema.sql")));
 await db.exec(strip(read("supabase/migrations/20260728090100_rls_policies.sql")));
+await db.exec(strip(read("supabase/migrations/20260730120000_requests.sql")));
 await db.exec(strip(read("supabase/seed.sql")));
 console.log("  migrations and seed applied");
 
@@ -209,7 +210,8 @@ console.log("\n=== repair.sql covers the migrations ===");
 {
   const migrations =
     read("supabase/migrations/20260728090000_initial_schema.sql") +
-    read("supabase/migrations/20260728090100_rls_policies.sql");
+    read("supabase/migrations/20260728090100_rls_policies.sql") +
+    read("supabase/migrations/20260730120000_requests.sql");
   const repair = read("supabase/repair.sql");
 
   const count = (text, pattern) => (text.match(pattern) ?? []).length;

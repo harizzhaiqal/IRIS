@@ -195,6 +195,123 @@ export type Database = {
           },
         ];
       };
+      requests: {
+        Row: {
+          id: number;
+          requester_id: number;
+          title: string;
+          description: string;
+          category: Database["public"]["Enums"]["request_category"];
+          estimated_cost_cents: number;
+          attachment_path: string | null;
+          attachment_name: string | null;
+          priority: Database["public"]["Enums"]["request_priority"];
+          assigned_department: string | null;
+          approval_required: boolean;
+          status: Database["public"]["Enums"]["request_status"];
+          ai_suggestion: Json | null;
+          reviewed_by: number | null;
+          reviewed_at: string | null;
+          review_comment: string | null;
+          created_time: string;
+          modified_time: string;
+        };
+        Insert: {
+          id?: never;
+          requester_id: number;
+          title: string;
+          description: string;
+          category?: Database["public"]["Enums"]["request_category"];
+          estimated_cost_cents?: number;
+          attachment_path?: string | null;
+          attachment_name?: string | null;
+          priority?: Database["public"]["Enums"]["request_priority"];
+          assigned_department?: string | null;
+          approval_required?: boolean;
+          status?: Database["public"]["Enums"]["request_status"];
+          ai_suggestion?: Json | null;
+          reviewed_by?: number | null;
+          reviewed_at?: string | null;
+          review_comment?: string | null;
+          created_time?: string;
+          modified_time?: string;
+        };
+        Update: {
+          id?: never;
+          requester_id?: number;
+          title?: string;
+          description?: string;
+          category?: Database["public"]["Enums"]["request_category"];
+          estimated_cost_cents?: number;
+          attachment_path?: string | null;
+          attachment_name?: string | null;
+          priority?: Database["public"]["Enums"]["request_priority"];
+          assigned_department?: string | null;
+          approval_required?: boolean;
+          status?: Database["public"]["Enums"]["request_status"];
+          ai_suggestion?: Json | null;
+          reviewed_by?: number | null;
+          reviewed_at?: string | null;
+          review_comment?: string | null;
+          created_time?: string;
+          modified_time?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "requests_requester_id_fkey";
+            columns: ["requester_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "requests_reviewed_by_fkey";
+            columns: ["reviewed_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      request_comments: {
+        Row: {
+          id: number;
+          request_id: number;
+          author_id: number;
+          body: string;
+          created_time: string;
+        };
+        Insert: {
+          id?: never;
+          request_id: number;
+          author_id: number;
+          body: string;
+          created_time?: string;
+        };
+        Update: {
+          id?: never;
+          request_id?: number;
+          author_id?: number;
+          body?: string;
+          created_time?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "request_comments_request_id_fkey";
+            columns: ["request_id"];
+            isOneToOne: false;
+            referencedRelation: "requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "request_comments_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       training_attachments: {
         Row: {
           id: number;
@@ -413,6 +530,10 @@ export type Database = {
         Args: { object_name: string };
         Returns: number;
       };
+      can_view_request: {
+        Args: { request: number };
+        Returns: boolean;
+      };
     };
     Enums: {
       submission_status:
@@ -422,6 +543,23 @@ export type Database = {
         | "approved"
         | "returned_by_hod"
         | "rejected";
+      request_status:
+        | "submitted"
+        | "pending_approval"
+        | "approved"
+        | "rejected"
+        | "in_progress"
+        | "completed";
+      request_category:
+        | "it_equipment"
+        | "office_furniture"
+        | "software"
+        | "access_card"
+        | "name_card"
+        | "office_equipment"
+        | "maintenance"
+        | "other";
+      request_priority: "low" | "normal" | "high" | "urgent";
       training_effectiveness: "effective" | "average" | "not_effective";
       user_role: "staff" | "hod" | "hr_admin";
     };

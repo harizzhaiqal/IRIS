@@ -714,3 +714,241 @@ alter default privileges in schema public
 
 alter default privileges in schema public
   grant all on tables to service_role;
+
+drop trigger if exists requests_touch_modified_time on public.requests;
+
+create trigger requests_touch_modified_time
+  before update on public.requests
+  for each row execute function public.touch_modified_time();
+
+-- ---------------------------------------------------------------------------
+-- Visibility helper
+--
+-- Defined once and reused by the comment policies, so the rule for "may I see
+-- this request" lives in exactly one place. security definer for the same
+-- reason as the training helpers: it must read users without re-entering the
+-- policies that call it.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.can_view_request(request integer)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+      from public.requests r
+     where r.id = request
+       and (
+         r.requester_id = public.current_user_id()
+         or public.is_hr_admin()
+         or public.is_my_team_member(r.requester_id)
+       )
+  );
+$$;
+
+revoke execute on function public.can_view_request(integer) from public;
+
+grant execute on function public.can_view_request(integer) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Row level security
+-- ---------------------------------------------------------------------------
+
+alter table public.requests enable row level security;
+
+alter table public.request_comments enable row level security;
+
+drop policy if exists requests_select_own on public.requests;
+
+-- A requester sees their own; a HOD sees their team's; HR sees everything.
+create policy requests_select_own on public.requests
+  for select to authenticated
+  using (requester_id = public.current_user_id());
+
+drop policy if exists requests_select_team on public.requests;
+
+create policy requests_select_team on public.requests
+  for select to authenticated
+  using (public.is_my_team_member(requester_id));
+
+drop policy if exists requests_select_hr on public.requests;
+
+create policy requests_select_hr on public.requests
+  for select to authenticated
+  using (public.is_hr_admin());
+
+drop policy if exists requests_insert_own on public.requests;
+
+-- Staff raise their own requests, and only in an opening state. Approving your
+-- own request by choosing the status on insert is what this forbids.
+create policy requests_insert_own on public.requests
+  for insert to authenticated
+  with check (
+    requester_id = public.current_user_id()
+    and status in ('submitted', 'pending_approval')
+  );
+
+drop policy if exists requests_update_own on public.requests;
+
+-- The requester may still correct a request nobody has picked up yet. Which
+-- columns they may touch is limited by enforce_request_update_rules.
+create policy requests_update_own on public.requests
+  for update to authenticated
+  using (
+    requester_id = public.current_user_id()
+    and status in ('submitted', 'pending_approval')
+  )
+  with check (requester_id = public.current_user_id());
+
+drop policy if exists requests_update_reviewer on public.requests;
+
+-- Reviewers act on requests they can see. The trigger below limits them to the
+-- review columns and stops anyone reviewing their own request.
+create policy requests_update_reviewer on public.requests
+  for update to authenticated
+  using (public.is_hr_admin() or public.is_my_team_member(requester_id))
+  with check (public.is_hr_admin() or public.is_my_team_member(requester_id));
+
+drop policy if exists request_comments_select on public.request_comments;
+
+-- Comments follow the request: if you can see it, you can read and add them.
+create policy request_comments_select on public.request_comments
+  for select to authenticated
+  using (public.can_view_request(request_id));
+
+drop policy if exists request_comments_insert on public.request_comments;
+
+create policy request_comments_insert on public.request_comments
+  for insert to authenticated
+  with check (
+    author_id = public.current_user_id()
+    and public.can_view_request(request_id)
+  );
+
+-- ---------------------------------------------------------------------------
+-- Update rules
+--
+-- The policies above decide who may write. This decides what they may write,
+-- which is the part a policy cannot express: a requester editing their own
+-- request must not be able to approve it, and a reviewer must not be able to
+-- rewrite the request they are judging.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.enforce_request_update_rules()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor integer := public.current_user_id();
+  is_owner boolean := old.requester_id = actor;
+  is_reviewer boolean := public.is_hr_admin()
+    or public.is_my_team_member(old.requester_id);
+begin
+  -- Nobody decides on their own request, whatever role they hold.
+  if is_owner and new.status is distinct from old.status
+     and new.status in ('approved', 'rejected') then
+    raise exception 'A request cannot be approved or rejected by the person who raised it';
+  end if;
+
+  if is_owner and not is_reviewer then
+    -- The requester may revise the request itself, never the verdict.
+    if new.status is distinct from old.status
+       and new.status not in ('submitted', 'pending_approval') then
+      raise exception 'A requester may not move their request beyond approval';
+    end if;
+
+    new.reviewed_by := old.reviewed_by;
+    new.reviewed_at := old.reviewed_at;
+    new.review_comment := old.review_comment;
+    return new;
+  end if;
+
+  if is_reviewer then
+    -- Reviewers judge; they do not rewrite what they are judging.
+    new.title := old.title;
+    new.description := old.description;
+    new.requester_id := old.requester_id;
+    new.estimated_cost_cents := old.estimated_cost_cents;
+    new.attachment_path := old.attachment_path;
+    new.attachment_name := old.attachment_name;
+    new.ai_suggestion := old.ai_suggestion;
+
+    -- A decision stamps itself, so no client can post-date or misattribute one.
+    if new.status is distinct from old.status
+       and new.status in ('approved', 'rejected') then
+      new.reviewed_by := actor;
+      new.reviewed_at := now();
+    end if;
+
+    return new;
+  end if;
+
+  raise exception 'Not permitted to change this request';
+end;
+$$;
+
+drop trigger if exists requests_enforce_update_rules on public.requests;
+
+create trigger requests_enforce_update_rules
+  before update on public.requests
+  for each row execute function public.enforce_request_update_rules();
+
+-- ---------------------------------------------------------------------------
+-- Privileges. Stated explicitly for the same reason as the training tables:
+-- default privileges are a property of the schema and do not survive a rebuild.
+-- ---------------------------------------------------------------------------
+
+grant select, insert, update, delete on public.requests to authenticated;
+
+grant select, insert, update, delete on public.request_comments to authenticated;
+
+grant all on public.requests to service_role;
+
+grant all on public.request_comments to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Storage: optional proof attached to a request.
+--
+-- Same path convention as training attachments — <requester_id>/<file> — so the
+-- owner check stays a prefix comparison on the first segment.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('request-attachments', 'request-attachments', false)
+on conflict (id) do nothing;
+
+drop policy if exists request_attachments_storage_select on storage.objects;
+
+create policy request_attachments_storage_select on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'request-attachments'
+    and (
+      public.storage_path_owner(name) = public.current_user_id()
+      or public.is_hr_admin()
+      or public.is_my_team_member(public.storage_path_owner(name))
+    )
+  );
+
+drop policy if exists request_attachments_storage_insert on storage.objects;
+
+create policy request_attachments_storage_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'request-attachments'
+    and public.storage_path_owner(name) = public.current_user_id()
+  );
+
+drop policy if exists request_attachments_storage_delete on storage.objects;
+
+create policy request_attachments_storage_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'request-attachments'
+    and public.storage_path_owner(name) = public.current_user_id()
+  );

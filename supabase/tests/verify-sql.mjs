@@ -152,6 +152,10 @@ console.log("\n=== Migration 2: RLS and workflow ===");
 await db.exec(stripExtensions(read("supabase/migrations/20260728090100_rls_policies.sql")));
 console.log("  applied without error");
 
+console.log("\n=== Migration 3: requests ===");
+await db.exec(stripExtensions(read("supabase/migrations/20260730120000_requests.sql")));
+console.log("  applied without error");
+
 // RLS is bypassed for the table owner, so force it for the test.
 //
 // Deliberately no GRANT here: the migration is expected to issue its own. It
@@ -163,6 +167,8 @@ await db.exec(`
   alter table public.training_records force row level security;
   alter table public.training_attachments force row level security;
   alter table public.automation_logs force row level security;
+  alter table public.requests force row level security;
+  alter table public.request_comments force row level security;
 `);
 
 // Assert the migration granted table access, rather than assuming it.
@@ -763,6 +769,149 @@ console.log("\n=== Records survive a new session ===");
     check("the entry still lists under its month", listed.rows[0].n === 1,
       `got ${listed.rows[0].n}`);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Requests — the prototype module. Smaller surface than training, but the same
+// two questions matter: who can see a request, and who can decide on it.
+// ---------------------------------------------------------------------------
+
+console.log("\n=== Requests: seed shape ===");
+{
+  const statuses = await db.query(
+    `select status, count(*)::int as n from public.requests group by status`,
+  );
+  const seen = Object.fromEntries(statuses.rows.map((r) => [r.status, r.n]));
+  const required = [
+    "submitted", "pending_approval", "approved",
+    "rejected", "in_progress", "completed",
+  ];
+  check("every request status appears in the seed",
+    required.every((s) => (seen[s] ?? 0) > 0), JSON.stringify(seen));
+
+  const cats = await db.query(
+    `select count(distinct category)::int as n from public.requests`);
+  check("the seed spans several categories", cats.rows[0].n >= 5, `${cats.rows[0].n}`);
+
+  const comments = await db.query(`select count(*)::int as n from public.request_comments`);
+  check("requests have comments to show", comments.rows[0].n >= 3, `${comments.rows[0].n}`);
+}
+
+console.log("\n=== Requests: visibility ===");
+{
+  await asUser(AUTH_UID.aiman, async () => {
+    const mine = await db.query(
+      `select count(*)::int as n from public.requests where requester_id <> $1`,
+      [uid.aiman]);
+    check("staff see no one else's requests", mine.rows[0].n === 0, `${mine.rows[0].n} leaked`);
+  });
+
+  await asUser(AUTH_UID.hr, async () => {
+    const all = await db.query(`select count(*)::int as n from public.requests`);
+    check("hr sees every request", all.rows[0].n === 10, `${all.rows[0].n}`);
+  });
+
+  await asUser(AUTH_UID.faizal, async () => {
+    // Faizal heads Software Development, so he sees his team's and his own.
+    const team = await db.query(`
+      select count(*)::int as n from public.requests r
+      join public.users u on u.id = r.requester_id
+      where u.hod_id is distinct from $1 and r.requester_id <> $2`,
+      [uid.faizal, uid.faizal]);
+    check("a hod sees only their team's requests and their own",
+      team.rows[0].n === 0, `${team.rows[0].n} outside the team`);
+  });
+}
+
+console.log("\n=== Requests: who may decide ===");
+{
+  // Faizal raised a request of his own; he must not be able to approve it even
+  // though he holds a reviewing role.
+  const own = await db.query(
+    `select id from public.requests where requester_id = $1 limit 1`, [uid.faizal]);
+  const ownId = own.rows[0].id;
+
+  await asUser(AUTH_UID.faizal, async () => {
+    await expectError("a reviewer cannot approve their own request", () =>
+      db.query(`update public.requests set status = 'approved' where id = $1`, [ownId]),
+      "cannot be approved or rejected by the person who raised it");
+  });
+
+  const others = await db.query(
+    `select id from public.requests where status = 'pending_approval' limit 1`);
+
+  await asUser(AUTH_UID.aiman, async () => {
+    // Two separate defences, and both are worth pinning down.
+    //
+    // First the policy: once a request has been decided, the USING clause stops
+    // matching it, so an update touches no rows rather than raising.
+    const settled = await db.query(
+      `update public.requests set title = 'Reopened by the requester'
+        where requester_id = $1 and status = 'approved' returning id`,
+      [uid.aiman]);
+    check("a decided request is out of its owner's reach",
+      settled.rows.length === 0, `${settled.rows.length} rows changed`);
+
+    // Then the trigger, on a request still inside the editable window: the row
+    // is reachable, so the rule about status has to do the work.
+    const fresh = await db.query(
+      `insert into public.requests (requester_id, title, description, category, status)
+       values ($1, 'Spare keyboard', 'The space bar sticks.', 'it_equipment', 'submitted')
+       returning id`,
+      [uid.aiman]);
+
+    await expectError("a requester cannot move their own request past approval", () =>
+      db.query(`update public.requests set status = 'completed' where id = $1`,
+        [fresh.rows[0].id]),
+      "may not move their request beyond approval");
+
+    await expectError("a requester cannot approve their own request", () =>
+      db.query(`update public.requests set status = 'approved' where id = $1`,
+        [fresh.rows[0].id]),
+      "cannot be approved or rejected by the person who raised it");
+  });
+
+  await asUser(AUTH_UID.hr, async () => {
+    const target = others.rows[0]?.id ?? ownId;
+
+    await db.query(
+      `update public.requests set status = 'approved' where id = $1`, [target]);
+
+    const row = await db.query(
+      `select status, reviewed_by, reviewed_at from public.requests where id = $1`,
+      [target]);
+    check("hr can approve a request", row.rows[0].status === "approved");
+    check("the decision stamps the reviewer automatically",
+      row.rows[0].reviewed_by === uid.hr && row.rows[0].reviewed_at !== null,
+      JSON.stringify(row.rows[0]));
+
+    // A reviewer judges; they must not be able to rewrite what they judged.
+    await db.query(
+      `update public.requests set title = 'Rewritten by the reviewer' where id = $1`,
+      [target]);
+    const after = await db.query(
+      `select title from public.requests where id = $1`, [target]);
+    check("a reviewer cannot rewrite the request they are judging",
+      after.rows[0].title !== "Rewritten by the reviewer", after.rows[0].title);
+  });
+}
+
+console.log("\n=== Requests: rejection needs a reason ===");
+{
+  const pending = await db.query(
+    `select id from public.requests where status = 'pending_approval' limit 1`);
+
+  if (pending.rows.length > 0) {
+    await asUser(AUTH_UID.hr, async () => {
+      await expectError("rejecting without a comment is refused", () =>
+        db.query(
+          `update public.requests set status = 'rejected', review_comment = null where id = $1`,
+          [pending.rows[0].id]),
+        "requests_rejection_needs_comment");
+    });
+  } else {
+    check("a pending request exists to reject", false, "none left in the seed");
+  }
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

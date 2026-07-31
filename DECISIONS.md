@@ -125,3 +125,21 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **The generator silently dropped four policies on its first run, and only a test caught it.** Statements were split on every semicolon, including the ones inside prose comments — "Reads are open; writes are not." severed that policy from its own `CREATE`, and three others went the same way. Nothing errored; the policies were simply absent, and a repaired database would have quietly lost its `users` select policy. The splitter now skips line comments and string literals, and `verify-repair.mjs` counts policies, functions and triggers against the migrations so an omission fails loudly rather than passing silently.
 
 **`verify-repair.mjs` breaks the database the way the dashboard does, not the way that is convenient to write.** Postgres validates a `language sql` body when the function is created, so a broken function cannot simply be declared: the helpers have to be written while the old table name still exists and stranded by a subsequent rename. Simulating it any other way would have tested a failure mode that cannot occur.
+
+## Request Management (prototype)
+
+**Backed by the database, not in-memory demo state.** The brief asked for "local state similar to the existing training provider pattern", but there is no provider in this codebase — Training Records is Supabase tables with typed query helpers and RLS. Following that is what "similar to the existing pattern" actually means here, and it avoids the failure this project already hit twice: data that disappears. An in-memory module would reset on every server restart, which is exactly the complaint that took several rounds to diagnose earlier in this build.
+
+**The requests migration only creates things, so it applies to a live database without losing data.** No drops, no schema rebuild. Pasting `supabase/migrations/20260730120000_requests.sql` adds the module to a database that already holds training records. `setup.sql` remains the rebuild path and still erases everything.
+
+**Costs are integer cents.** Same reasoning as integer minutes for durations: a float total eventually reports a figure nobody can reconcile. `lib/utils/money.ts` parses what the user typed by assembling digits rather than multiplying a float, so 8.90 cannot arrive as 889 cents.
+
+**The suggestion engine is deterministic keyword matching, not a model call.** For a prototype that is the better trade: no key to configure, nothing to rate-limit during a demo, and — the part that matters most — it is unit-testable, so its output is pinned by 29 tests rather than re-rolled on each run. It runs as a server action so that swapping in a real model later changes one pure function and never puts a key in the browser bundle. Category rules are ordered rather than scored, because "laptop repair" must file under IT and not Maintenance; the first match wins and the equipment rules are consulted first.
+
+**`ai_suggestion` is stored on the request even after the requester overrules it.** A reviewer can then see both what was proposed and what was actually filed, and the detail page names the differences explicitly. Keeping only the final values would have hidden the one thing that makes an AI suggestion worth auditing.
+
+**Two defences on who may decide, and both are tested.** The RLS policies decide who may write; a `before update` trigger decides what they may write. The trigger stops anyone approving their own request whatever role they hold, stops a requester moving their own request past approval, and blanks any attempt by a reviewer to rewrite the request they are judging. A decision stamps its own reviewer and timestamp so no client can misattribute one.
+
+**A `cancelRequest` action was written and then removed.** Withdrawing is not in the brief, and the requests table has no DELETE policy — the action would have reported success while deleting nothing, since RLS filters a delete to zero rows rather than raising. Shipping a button that silently does nothing is worse than not shipping it.
+
+**`lib/actionResult.ts` was extracted for the shared `ActionResult` type.** Training still declares its own copy. Migrating it is a change to the finished module and is deliberately not bundled with new work.
