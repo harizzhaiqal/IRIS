@@ -763,7 +763,6 @@ alter table public.request_comments enable row level security;
 
 drop policy if exists requests_select_own on public.requests;
 
--- A requester sees their own; a HOD sees their team's; HR sees everything.
 create policy requests_select_own on public.requests
   for select to authenticated
   using (requester_id = public.current_user_id());
@@ -782,8 +781,6 @@ create policy requests_select_hr on public.requests
 
 drop policy if exists requests_insert_own on public.requests;
 
--- Staff raise their own requests, and only in an opening state. Approving your
--- own request by choosing the status on insert is what this forbids.
 create policy requests_insert_own on public.requests
   for insert to authenticated
   with check (
@@ -793,8 +790,6 @@ create policy requests_insert_own on public.requests
 
 drop policy if exists requests_update_own on public.requests;
 
--- The requester may still correct a request nobody has picked up yet. Which
--- columns they may touch is limited by enforce_request_update_rules.
 create policy requests_update_own on public.requests
   for update to authenticated
   using (
@@ -805,8 +800,6 @@ create policy requests_update_own on public.requests
 
 drop policy if exists requests_update_reviewer on public.requests;
 
--- Reviewers act on requests they can see. The trigger below limits them to the
--- review columns and stops anyone reviewing their own request.
 create policy requests_update_reviewer on public.requests
   for update to authenticated
   using (public.is_hr_admin() or public.is_my_team_member(requester_id))
@@ -814,7 +807,6 @@ create policy requests_update_reviewer on public.requests
 
 drop policy if exists request_comments_select on public.request_comments;
 
--- Comments follow the request: if you can see it, you can read and add them.
 create policy request_comments_select on public.request_comments
   for select to authenticated
   using (public.can_view_request(request_id));

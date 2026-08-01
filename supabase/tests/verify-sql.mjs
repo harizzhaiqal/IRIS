@@ -153,8 +153,21 @@ await db.exec(stripExtensions(read("supabase/migrations/20260728090100_rls_polic
 console.log("  applied without error");
 
 console.log("\n=== Migration 3: requests ===");
-await db.exec(stripExtensions(read("supabase/migrations/20260730120000_requests.sql")));
+const requestsMigration = stripExtensions(
+  read("supabase/migrations/20260730120000_requests.sql"),
+);
+await db.exec(requestsMigration);
 console.log("  applied without error");
+
+// This file is pasted into the SQL Editor by hand to add the module to a
+// database that already holds data, so a second paste must be a no-op rather
+// than an error partway down. It once was not: CREATE TYPE has no IF NOT EXISTS.
+try {
+  await db.exec(requestsMigration);
+  check("the requests migration can be applied twice", true);
+} catch (error) {
+  check("the requests migration can be applied twice", false, error.message);
+}
 
 // RLS is bypassed for the table owner, so force it for the test.
 //

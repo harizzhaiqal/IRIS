@@ -8,27 +8,41 @@
 -- Enums
 -- ---------------------------------------------------------------------------
 
-create type public.request_status as enum (
-  'submitted',
-  'pending_approval',
-  'approved',
-  'rejected',
-  'in_progress',
-  'completed'
-);
+-- Guarded rather than bare CREATE TYPE: Postgres offers no IF NOT EXISTS for
+-- types, and this file is pasted straight into the SQL Editor to add the module
+-- to a database that already has data. A second paste must be a no-op, not an
+-- error halfway down the script.
+do $enums$
+begin
+  if not exists (select 1 from pg_type where typname = 'request_status') then
+    create type public.request_status as enum (
+      'submitted',
+      'pending_approval',
+      'approved',
+      'rejected',
+      'in_progress',
+      'completed'
+    );
+  end if;
 
-create type public.request_category as enum (
-  'it_equipment',
-  'office_furniture',
-  'software',
-  'access_card',
-  'name_card',
-  'office_equipment',
-  'maintenance',
-  'other'
-);
+  if not exists (select 1 from pg_type where typname = 'request_category') then
+    create type public.request_category as enum (
+      'it_equipment',
+      'office_furniture',
+      'software',
+      'access_card',
+      'name_card',
+      'office_equipment',
+      'maintenance',
+      'other'
+    );
+  end if;
 
-create type public.request_priority as enum ('low', 'normal', 'high', 'urgent');
+  if not exists (select 1 from pg_type where typname = 'request_priority') then
+    create type public.request_priority as enum ('low', 'normal', 'high', 'urgent');
+  end if;
+end
+$enums$;
 
 -- ---------------------------------------------------------------------------
 -- Requests
@@ -42,7 +56,7 @@ create type public.request_priority as enum ('low', 'normal', 'high', 'urgent');
 -- actually chosen.
 -- ---------------------------------------------------------------------------
 
-create table public.requests (
+create table if not exists public.requests (
   id integer primary key generated always as identity,
   requester_id integer not null references public.users (id) on delete cascade,
   title text not null,
@@ -75,17 +89,17 @@ create table public.requests (
   )
 );
 
-create index requests_requester_idx on public.requests (requester_id);
-create index requests_status_idx on public.requests (status);
-create index requests_category_idx on public.requests (category);
-create index requests_priority_idx on public.requests (priority);
-create index requests_created_idx on public.requests (created_time desc);
+create index if not exists requests_requester_idx on public.requests (requester_id);
+create index if not exists requests_status_idx on public.requests (status);
+create index if not exists requests_category_idx on public.requests (category);
+create index if not exists requests_priority_idx on public.requests (priority);
+create index if not exists requests_created_idx on public.requests (created_time desc);
 
 -- ---------------------------------------------------------------------------
 -- Comments — the conversation a request accumulates while it is handled.
 -- ---------------------------------------------------------------------------
 
-create table public.request_comments (
+create table if not exists public.request_comments (
   id integer primary key generated always as identity,
   request_id integer not null references public.requests (id) on delete cascade,
   author_id integer not null references public.users (id) on delete cascade,
@@ -94,8 +108,10 @@ create table public.request_comments (
   constraint request_comments_body_not_blank check (length(btrim(body)) > 0)
 );
 
-create index request_comments_request_idx
+create index if not exists request_comments_request_idx
   on public.request_comments (request_id, created_time);
+
+drop trigger if exists requests_touch_modified_time on public.requests;
 
 create trigger requests_touch_modified_time
   before update on public.requests
@@ -140,13 +156,19 @@ alter table public.requests enable row level security;
 alter table public.request_comments enable row level security;
 
 -- A requester sees their own; a HOD sees their team's; HR sees everything.
+drop policy if exists requests_select_own on public.requests;
+
 create policy requests_select_own on public.requests
   for select to authenticated
   using (requester_id = public.current_user_id());
 
+drop policy if exists requests_select_team on public.requests;
+
 create policy requests_select_team on public.requests
   for select to authenticated
   using (public.is_my_team_member(requester_id));
+
+drop policy if exists requests_select_hr on public.requests;
 
 create policy requests_select_hr on public.requests
   for select to authenticated
@@ -154,6 +176,8 @@ create policy requests_select_hr on public.requests
 
 -- Staff raise their own requests, and only in an opening state. Approving your
 -- own request by choosing the status on insert is what this forbids.
+drop policy if exists requests_insert_own on public.requests;
+
 create policy requests_insert_own on public.requests
   for insert to authenticated
   with check (
@@ -163,6 +187,8 @@ create policy requests_insert_own on public.requests
 
 -- The requester may still correct a request nobody has picked up yet. Which
 -- columns they may touch is limited by enforce_request_update_rules.
+drop policy if exists requests_update_own on public.requests;
+
 create policy requests_update_own on public.requests
   for update to authenticated
   using (
@@ -173,15 +199,21 @@ create policy requests_update_own on public.requests
 
 -- Reviewers act on requests they can see. The trigger below limits them to the
 -- review columns and stops anyone reviewing their own request.
+drop policy if exists requests_update_reviewer on public.requests;
+
 create policy requests_update_reviewer on public.requests
   for update to authenticated
   using (public.is_hr_admin() or public.is_my_team_member(requester_id))
   with check (public.is_hr_admin() or public.is_my_team_member(requester_id));
 
 -- Comments follow the request: if you can see it, you can read and add them.
+drop policy if exists request_comments_select on public.request_comments;
+
 create policy request_comments_select on public.request_comments
   for select to authenticated
   using (public.can_view_request(request_id));
+
+drop policy if exists request_comments_insert on public.request_comments;
 
 create policy request_comments_insert on public.request_comments
   for insert to authenticated
@@ -254,6 +286,8 @@ begin
 end;
 $$;
 
+drop trigger if exists requests_enforce_update_rules on public.requests;
+
 create trigger requests_enforce_update_rules
   before update on public.requests
   for each row execute function public.enforce_request_update_rules();
@@ -279,6 +313,8 @@ insert into storage.buckets (id, name, public)
 values ('request-attachments', 'request-attachments', false)
 on conflict (id) do nothing;
 
+drop policy if exists request_attachments_storage_select on storage.objects;
+
 create policy request_attachments_storage_select on storage.objects
   for select to authenticated
   using (
@@ -290,12 +326,16 @@ create policy request_attachments_storage_select on storage.objects
     )
   );
 
+drop policy if exists request_attachments_storage_insert on storage.objects;
+
 create policy request_attachments_storage_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'request-attachments'
     and public.storage_path_owner(name) = public.current_user_id()
   );
+
+drop policy if exists request_attachments_storage_delete on storage.objects;
 
 create policy request_attachments_storage_delete on storage.objects
   for delete to authenticated
