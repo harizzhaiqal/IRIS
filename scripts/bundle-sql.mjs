@@ -67,6 +67,38 @@ where user_id in (select id from auth.users where email like '%@irs.com.my');
 delete from auth.users where email like '%@irs.com.my';
 `;
 
+const footer = `
+
+-- ===========================================================================
+-- Remove auth accounts left over from an earlier roster.
+--
+-- The rebuild above dropped public.users and the seed has just recreated
+-- exactly the accounts that belong, so anything still in auth.users without a
+-- profile is from a previous run under a different name or email domain.
+--
+-- This matters beyond tidiness: auth.users belongs to Supabase Auth and knows
+-- nothing about profiles, so an orphan can still sign in. The app then finds no
+-- profile, sends the user back to the login page, middleware sends them on to
+-- the dashboard, and they loop on a blank screen.
+--
+-- Matching on a list of old email domains would need editing every time the
+-- roster changes. "Has no profile" needs editing never.
+-- ===========================================================================
+
+delete from auth.identities
+where user_id in (
+  select a.id
+    from auth.users a
+    left join public.users u on u.auth_user_id = a.id
+   where u.id is null
+);
+
+delete from auth.users as a
+where not exists (
+  select 1 from public.users u where u.auth_user_id = a.id
+);
+`;
+
 const body = SOURCES.map(
   (f) =>
     `\n\n-- ===========================================================================\n` +
@@ -75,5 +107,8 @@ const body = SOURCES.map(
     read(f),
 ).join("");
 
-writeFileSync(new URL("../supabase/setup.sql", import.meta.url), header + body);
+writeFileSync(
+  new URL("../supabase/setup.sql", import.meta.url),
+  header + body + footer,
+);
 console.log(`supabase/setup.sql written from ${SOURCES.length} sources`);

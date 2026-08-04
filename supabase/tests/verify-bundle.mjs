@@ -146,7 +146,30 @@ async function applyBundle(label) {
   return counts;
 }
 
+// An account from an earlier roster, under the old email domain. It has no
+// profile after the rebuild, and it can still sign in, so the bundle has to
+// clear it — matching on the current domain alone would leave it behind.
+await db.query(`
+  insert into auth.users (id, email, aud, role)
+  values ('deadbeef-0000-0000-0000-000000000001', 'ghost@irssoftware.test',
+          'authenticated', 'authenticated')
+`);
+
 const first = await applyBundle("First run (fresh database)");
+
+{
+  const { rows } = await db.query(`
+    select count(*)::int as n from auth.users a
+     left join public.users u on u.auth_user_id = a.id
+     where u.id is null
+  `);
+  check("no auth account is left without a profile", rows[0].n === 0,
+    `${rows[0].n} orphaned`);
+
+  const { rows: ghost } = await db.query(
+    `select count(*)::int as n from auth.users where email = 'ghost@irssoftware.test'`);
+  check("an account from the previous roster is removed", ghost[0].n === 0);
+}
 
 check("8 users seeded", first.users === 8, `got ${first.users}`);
 check("7 departments seeded", first.departments === 7, `got ${first.departments}`);
