@@ -169,6 +169,12 @@ try {
   check("the requests migration can be applied twice", false, error.message);
 }
 
+console.log("\n=== Migration 4: create_user ===");
+await db.exec(
+  stripExtensions(read("supabase/migrations/20260804000000_create_user.sql")),
+);
+console.log("  applied without error");
+
 // RLS is bypassed for the table owner, so force it for the test.
 //
 // Deliberately no GRANT here: the migration is expected to issue its own. It
@@ -435,6 +441,15 @@ console.log("\n=== total_minutes cannot be forged ===");
     after.rows[0].total_minutes === total_minutes, `got ${after.rows[0].total_minutes}`);
 }
 
+// Fewer than the number of accounts: HR administers the process rather than
+// taking part in it, and the CEO neither submits nor approves. Read from the
+// data rather than restated, because who files is a policy decision that has
+// already changed once.
+const { rows: filers } = await db.query(
+  `select count(distinct employee_id)::int as n from public.training_submissions`,
+);
+const employeesWithRecords = filers[0].n;
+
 console.log("\n=== RLS: row visibility ===");
 {
   await asUser(AUTH_UID.staffRnd, async () => {
@@ -475,7 +490,8 @@ console.log("\n=== RLS: row visibility ===");
   await asUser(AUTH_UID.hr, async () => {
     const all = await db.query(
       `select count(distinct employee_id)::int as n from public.training_submissions`);
-    check("hr sees every employee who files a record", all.rows[0].n === 7,
+    check("hr sees every employee who files a record",
+      all.rows[0].n === employeesWithRecords,
       `got ${all.rows[0].n}`);
 
     const logs = await db.query(`select count(*)::int as n from public.automation_logs`);
@@ -963,7 +979,9 @@ console.log("\n=== CEO: reads everything ===");
 
     const subs = await db.query(
       `select count(distinct employee_id)::int as n from public.training_submissions`);
-    check("ceo sees every employee's training", subs.rows[0].n === 7, `${subs.rows[0].n}`);
+    check("ceo sees every employee's training",
+      subs.rows[0].n === employeesWithRecords,
+      `${subs.rows[0].n} of ${employeesWithRecords}`);
 
     const records = await db.query(`select count(*)::int as n from public.training_records`);
     check("ceo sees the training entries behind them", records.rows[0].n > 0);
@@ -1056,6 +1074,167 @@ console.log("\n=== CEO: writes nothing ===");
     `select count(*)::int as n from public.training_records
       where title = 'Rewritten by the CEO'`);
   check("no training entry was rewritten", rewritten.rows[0].n === 0);
+}
+
+// Adding a person is three rows in two schemas, and a miss in any one of them
+// produces an account that looks present and does not work. Runs last so the
+// row counts asserted earlier are not disturbed.
+console.log("\n=== create_user ===");
+{
+  const created = await db.query(
+    `select * from public.create_user('Nur Batrisyia Binti Kamal', 'batrisyia@irs.com.my')`,
+  );
+  check("name and email alone create a person", created.rows.length === 1,
+    JSON.stringify(created.rows[0]));
+
+  const newId = created.rows[0]?.profile_id;
+  check("the new profile id is an integer", Number.isInteger(newId), `got ${newId}`);
+
+  const profile = await db.query(
+    `select id, auth_user_id, email, full_name, role, is_active, date_joined
+       from public.profiles where id = $1`, [newId]);
+  check("the profile row is written", profile.rows.length === 1);
+  check("it defaults to staff and active",
+    profile.rows[0]?.role === "staff" && profile.rows[0]?.is_active === true);
+  check("date_joined is filled rather than left null",
+    profile.rows[0]?.date_joined !== null);
+
+  const authUid = profile.rows[0]?.auth_user_id;
+
+  const authRow = await db.query(
+    `select email, email_confirmed_at, encrypted_password
+       from auth.users where id = $1`, [authUid]);
+  check("the credential row is written", authRow.rows.length === 1);
+  check("the email is confirmed, so sign-in is not blocked",
+    authRow.rows[0]?.email_confirmed_at !== null);
+  check("a password hash is stored", Boolean(authRow.rows[0]?.encrypted_password));
+
+  // The row most easily forgotten: GoTrue resolves an email/password sign-in
+  // through auth.identities, so without it the account exists and cannot log in.
+  const identity = await db.query(
+    `select provider, provider_id from auth.identities where user_id = $1`, [authUid]);
+  check("the provider link is written", identity.rows.length === 1);
+  check("the identity is an email provider keyed by the auth uuid",
+    identity.rows[0]?.provider === "email" &&
+    identity.rows[0]?.provider_id === authUid);
+
+  const logged = await db.query(
+    `select related_table, related_id, is_system from public.automation_logs
+      where action_type = 'profile.created' and related_id = $1`, [newId]);
+  check("the creation is recorded in the audit trail",
+    logged.rows.length === 1 && logged.rows[0].related_table === "profiles" &&
+    logged.rows[0].is_system === true);
+
+  // The point of the whole exercise: the person can actually be resolved the
+  // way a request resolves them, uuid in the JWT through to the integer key.
+  await asUser(authUid, async () => {
+    const me = await db.query(`select public.current_user_id() as id`);
+    check("the new account resolves through current_user_id()",
+      me.rows[0].id === newId, `got ${me.rows[0].id}`);
+
+    const visible = await db.query(
+      `select count(*)::int as n from public.profiles p where p.id = $1`, [newId]);
+    check("the new account can read its own profile under RLS",
+      visible.rows[0].n === 1);
+  });
+
+  // Addresses are the natural key here, so they are normalised before storing.
+  // '  Foo@IRS.COM.MY ' and 'foo@irs.com.my' must not become two people.
+  const messy = await db.query(
+    `select * from public.create_user('  Lim Wei Sheng  ', '  WeiSheng@IRS.COM.MY  ')`,
+  );
+  const stored = await db.query(
+    `select email, full_name from public.profiles where id = $1`,
+    [messy.rows[0].profile_id]);
+  check("the email is lowercased and trimmed",
+    stored.rows[0]?.email === "weisheng@irs.com.my", stored.rows[0]?.email);
+  check("the name is trimmed", stored.rows[0]?.full_name === "Lim Wei Sheng");
+
+  await expectError("a duplicate email is refused, not overwritten", () =>
+    db.query(`select public.create_user('Someone Else', 'BATRISYIA@irs.com.my')`),
+    "profile already exists");
+
+  await expectError("an address that is not an email is refused", () =>
+    db.query(`select public.create_user('No Address', 'not-an-email')`),
+    "valid email address is required");
+
+  await expectError("a blank name is refused", () =>
+    db.query(`select public.create_user('   ', 'blank.name@irs.com.my')`),
+    "full name is required");
+
+  // A mistyped department would otherwise put the person in no department at
+  // all, which reads as deliberate and is not.
+  await expectError("an unknown department is refused", () =>
+    db.query(
+      `select public.create_user('Wrong Dept', 'wrong.dept@irs.com.my',
+         p_department_name => 'Reserch and Development')`),
+    "no department named");
+
+  // Verification is matched on profiles.hod_id, so a staff member without one
+  // has nobody who can verify their month. Naming a department fills it in.
+  const withDept = await db.query(
+    `select * from public.create_user('Tan Mei Ling', 'meiling@irs.com.my',
+       p_role => 'staff', p_department_name => 'R&D',
+       p_designation => 'Software Engineer')`);
+  const placed = await db.query(
+    `select p.department_id, p.hod_id, p.designation
+       from public.profiles p where p.id = $1`, [withDept.rows[0].profile_id]);
+  check("a named department is resolved to its id",
+    placed.rows[0]?.department_id !== null);
+  check("the reporting line is inherited from the head of that department",
+    placed.rows[0]?.hod_id === uid.ks, `got ${placed.rows[0]?.hod_id}`);
+  check("the designation is stored", placed.rows[0]?.designation === "Software Engineer");
+  check("the returned row names the department and the reviewer",
+    withDept.rows[0].department === "R&D" &&
+    withDept.rows[0].reports_to === "Chng Kok Sheng",
+    JSON.stringify(withDept.rows[0]));
+
+  // And the HOD is verifiable in the direction that matters: the head of
+  // department must now see this person as one of their team.
+  await asUser(AUTH_UID.ks, async () => {
+    const mine = await db.query(
+      `select public.is_my_team_member($1) as ok`, [withDept.rows[0].profile_id]);
+    check("the new hire shows up as a member of that HOD's team",
+      mine.rows[0].ok === true);
+  });
+
+  const override = await db.query(
+    `select * from public.create_user('Ravi Kumar', 'ravi@irs.com.my',
+       p_role => 'staff', p_department_name => 'R&D',
+       p_hod_email => 'joshua@irs.com.my')`);
+  const overridden = await db.query(
+    `select p.hod_id from public.profiles p where p.id = $1`,
+    [override.rows[0].profile_id]);
+  check("an explicit p_hod_email overrides the department's head",
+    overridden.rows[0]?.hod_id === uid.joshua, `got ${overridden.rows[0]?.hod_id}`);
+
+  // A failure must not leave a credential behind with no profile against it,
+  // or the address is burnt: the retry then trips the orphaned-account check.
+  const before = await db.query(`select count(*)::int as n from auth.users`);
+  try {
+    await db.query(
+      `select public.create_user('Half Made', 'half.made@irs.com.my',
+         p_department_name => 'Nowhere')`);
+  } catch {
+    // expected
+  }
+  const after = await db.query(`select count(*)::int as n from auth.users`);
+  check("a rejected call leaves no half-made account behind",
+    after.rows[0].n === before.rows[0].n,
+    `${before.rows[0].n} -> ${after.rows[0].n}`);
+
+  const retry = await db.query(
+    `select * from public.create_user('Half Made', 'half.made@irs.com.my')`);
+  check("and the address is still free to use afterwards",
+    Number.isInteger(retry.rows[0]?.profile_id));
+
+  // Ids must keep counting, not jump, after all of the above.
+  const span = await db.query(
+    `select min(id)::int as lo, max(id)::int as hi, count(*)::int as n
+       from public.profiles`);
+  check("profile ids still count 1..n after every insert and rejection",
+    span.rows[0].lo === 1 && span.rows[0].hi === span.rows[0].n,
+    `lo=${span.rows[0].lo} hi=${span.rows[0].hi} n=${span.rows[0].n}`);
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

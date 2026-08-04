@@ -1,0 +1,75 @@
+-- ===========================================================================
+-- IRIS — add one person.
+--
+-- Edit the name and the email on the line below, paste the whole file into the
+-- Supabase SQL Editor, and press Run. Everything else has a default.
+--
+-- It writes the three rows a person actually consists of — the sign-in
+-- credential (auth.users), the provider link GoTrue needs (auth.identities),
+-- and the staff directory row (public.profiles) — plus an entry in the audit
+-- log. The result grid shows what was created, including the password to hand
+-- over.
+--
+-- Safe to get wrong: it refuses rather than overwrites if the email is already
+-- in use, and a failure part-way leaves nothing behind, because the whole call
+-- is one statement and therefore one transaction.
+-- ===========================================================================
+
+select * from public.create_user(
+  'Full Name Here',
+  'email@irs.com.my'
+);
+
+
+-- ---------------------------------------------------------------------------
+-- The optional arguments
+--
+-- Name and email are all that is required. Pass any of these to fill in more:
+--
+--   p_role             'staff' (default), 'hod', 'hr_admin', 'ceo'
+--   p_department_name  must match public.departments.name
+--   p_designation      job title shown on their record
+--   p_date_joined      defaults to today
+--   p_password         defaults to 'Password123!'
+--   p_hod_email        who verifies their monthly record — see the note below
+--
+-- Fuller example:
+--
+--   select * from public.create_user(
+--     'Aiman Hakim Bin Zulkifli',
+--     'aiman@irs.com.my',
+--     p_role            => 'staff',
+--     p_department_name => 'R&D',
+--     p_designation     => 'Software Engineer',
+--     p_date_joined     => date '2026-08-04'
+--   );
+--
+-- ---------------------------------------------------------------------------
+-- Worth knowing: the reporting line
+--
+-- Training records are verified by the person's head of department, matched on
+-- profiles.hod_id. A staff member created with only a name and an email has no
+-- department and therefore no HOD, so their monthly record has nobody who can
+-- verify it and would sit at "Pending HOD" indefinitely. The function prints a
+-- notice when that happens.
+--
+-- Passing p_department_name sets the reporting line automatically, to whoever
+-- heads that department. p_hod_email overrides it. To fix it afterwards:
+--
+--   update public.profiles
+--      set hod_id = (select id from public.profiles where email = 'joshua@irs.com.my')
+--    where email = 'email@irs.com.my';
+--
+-- ---------------------------------------------------------------------------
+-- Useful lookups
+--
+--   select id, name, hod_id from public.departments order by name;
+--   select id, full_name, email, role from public.profiles order by id;
+--
+-- ---------------------------------------------------------------------------
+-- If public.create_user does not exist
+--
+-- It arrives with the schema. On a database created before it was added, paste
+-- supabase/migrations/20260804000000_create_user.sql once, then run this file.
+-- Nothing is dropped or rebuilt by doing so.
+-- ---------------------------------------------------------------------------

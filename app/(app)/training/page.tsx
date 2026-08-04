@@ -23,7 +23,7 @@ import {
   getSubmissionForMonth,
   listYearSubmissions,
 } from "@/lib/queries/submissions";
-import { isEditableStatus, isReadOnlyRole } from "@/lib/types";
+import { filesOwnRecords, isEditableStatus } from "@/lib/types";
 import { minutesToHHMM } from "@/lib/utils/duration";
 import {
   daysUntilDeadline,
@@ -56,8 +56,9 @@ export default async function TrainingPage({
 }) {
   const profile = await requireProfile();
 
-  // The CEO keeps no record of their own; the company view is the useful page.
-  if (isReadOnlyRole(profile.role)) redirect("/training/submissions");
+  // HR administers the process rather than taking part in it, and the CEO
+  // neither submits nor approves, so for both this page would always be empty.
+  if (!filesOwnRecords(profile.role)) redirect("/training/submissions");
   const { month, year } = resolvePeriod(searchParams);
 
   const [targets, submission, yearSubmissions] = await Promise.all([

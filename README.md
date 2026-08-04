@@ -46,10 +46,15 @@ constraint, and reviewers are shown both numbers side by side.
 
 | Role | Can do |
 | --- | --- |
-| `staff` | Record and submit their own training |
-| `hod` | Verify their team's submissions first; also submit their own record |
-| `hr_admin` | Verify second, and monitor everyone |
-| `ceo` | Read the whole company. Submits nothing, approves nothing. |
+| `staff` | Record and submit their own training; raise their own requests |
+| `hod` | The above, plus verify their team's submissions and requests first |
+| `hr_admin` | Verify second and monitor everyone. Keeps no record of their own. |
+| `ceo` | Read the whole company. Submits nothing, raises nothing, approves nothing. |
+
+Only `staff` and `hod` see **My training** and can raise a request. HR
+administers the process rather than taking part in it, so their menu is the
+dashboard, the training review queue, and the request review queue — which also
+removes the case where HR approved a training record they had filed themselves.
 
 ## Local setup
 

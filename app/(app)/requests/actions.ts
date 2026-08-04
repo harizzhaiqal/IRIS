@@ -7,7 +7,11 @@ import { suggestRequest, type RequestSuggestion } from "@/lib/ai/suggestRequest"
 import { requireProfile } from "@/lib/auth";
 import { logAction } from "@/lib/automationLog";
 import { createClient } from "@/lib/supabase/server";
-import { isReadOnlyRole, type RequestStatus } from "@/lib/types";
+import {
+  filesOwnRecords,
+  isReadOnlyRole,
+  type RequestStatus,
+} from "@/lib/types";
 import {
   createRequestSchema,
   requestCommentSchema,
@@ -49,8 +53,10 @@ export async function createRequest(
 ): Promise<ActionResult<{ requestId: number }>> {
   const profile = await requireProfile();
 
-  if (isReadOnlyRole(profile.role)) {
-    return failed("Your account has view-only access.");
+  // HR and the CEO review requests rather than raising them, so this is a
+  // wider gate than the read-only one used by the decision actions below.
+  if (!filesOwnRecords(profile.role)) {
+    return failed("This account reviews requests rather than raising them.");
   }
 
   const parsed = createRequestSchema.safeParse(input);

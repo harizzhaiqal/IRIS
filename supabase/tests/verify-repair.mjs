@@ -211,10 +211,27 @@ console.log("\n=== repair.sql covers the migrations ===");
   const migrations =
     read("supabase/migrations/20260728090000_initial_schema.sql") +
     read("supabase/migrations/20260728090100_rls_policies.sql") +
-    read("supabase/migrations/20260730120000_requests.sql");
+    read("supabase/migrations/20260730120000_requests.sql") +
+    read("supabase/migrations/20260804000000_create_user.sql");
   const repair = read("supabase/repair.sql");
 
   const count = (text, pattern) => (text.match(pattern) ?? []).length;
+
+  /**
+   * Blanks out dollar-quoted function bodies, keeping line structure so the
+   * line-anchored patterns below still line up.
+   *
+   * Defining a function is not running it. create_user's body contains
+   * `insert into public.profiles`, which the row-writing check reads as
+   * repair.sql inserting a person — it does not; it only declares a function
+   * that would, if someone called it. The check exists to catch a top-level
+   * INSERT or CREATE TABLE slipping into the generated file, and that is what
+   * it should still see.
+   */
+  const withoutFunctionBodies = (sql) =>
+    sql.replace(/\$([A-Za-z_]*)\$[\s\S]*?\$\1\$/g, (body) =>
+      body.replace(/[^\n]/g, " "),
+    );
 
   const kinds = [
     ["policies", /^create\s+policy\s/gim],
@@ -237,9 +254,12 @@ console.log("\n=== repair.sql covers the migrations ===");
   check("every trigger is dropped before it is created",
     count(repair, /^create\s+trigger\s/gim) === count(repair, /^drop\s+trigger\s+if\s+exists\s/gim));
 
-  // The whole promise of the file.
+  // The whole promise of the file. Read with function bodies blanked, so it
+  // judges what repair.sql does rather than what it defines.
   check("repair.sql creates no tables and writes no application rows",
-    !/^\s*(create\s+table|drop\s+schema|create\s+type|insert\s+into\s+public\.)/im.test(repair));
+    !/^\s*(create\s+table|drop\s+schema|create\s+type|insert\s+into\s+public\.)/im.test(
+      withoutFunctionBodies(repair),
+    ));
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

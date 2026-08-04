@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { isEditableStatus } from "@/lib/types";
+import { filesOwnRecords, isEditableStatus } from "@/lib/types";
 import { minutesToHHMM } from "@/lib/utils/duration";
 import { monthName } from "@/lib/utils/targets";
 import { EntryForm, type EntryFormDefaults } from "./entry-form";
@@ -28,6 +28,10 @@ export default async function NewTrainingPage({
   searchParams: { recordId?: string; month?: string; year?: string };
 }) {
   const profile = await requireProfile();
+
+  // No monthly record to add an entry to.
+  if (!filesOwnRecords(profile.role)) redirect("/training/submissions");
+
   const now = new Date();
 
   const month = Number(searchParams.month) || now.getMonth() + 1;

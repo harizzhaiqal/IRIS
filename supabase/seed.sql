@@ -261,9 +261,10 @@ begin
         (2, 'chen@irs.com.my',          200, 'lead'),
         (3, 'lee@irs.com.my',           170, 'lead'),
         (4, 'staff.rnd@irs.com.my',     290, 'engineering'),
-        (5, 'staff.support@irs.com.my', 165, 'support'),
-        -- HR records training of its own too.
-        (6, 'hr@irs.com.my',            235, 'lead')
+        (5, 'staff.support@irs.com.my', 165, 'support')
+        -- HR and the CEO are deliberately absent. HR administers the process
+        -- rather than taking part in it, which also removes the case where HR
+        -- approved a record they had filed themselves.
       ) as v (idx, email, base_minutes, catalogue)
       join public.profiles u on u.email = v.email
      order by v.idx

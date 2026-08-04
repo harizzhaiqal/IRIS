@@ -9,6 +9,7 @@ const SOURCES = [
   "supabase/migrations/20260728090000_initial_schema.sql",
   "supabase/migrations/20260728090100_rls_policies.sql",
   "supabase/migrations/20260730120000_requests.sql",
+  "supabase/migrations/20260804000000_create_user.sql",
   "supabase/seed.sql",
 ];
 

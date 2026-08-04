@@ -39,6 +39,7 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   "training_record.deleted": "Training entry removed",
   "training_attachment.added": "Document attached",
   "training_attachment.removed": "Document removed",
+  "profile.created": "Staff account created",
 };
 
 export function activityLabel(actionType: string): string {

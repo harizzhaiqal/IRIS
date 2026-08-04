@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireProfile } from "@/lib/auth";
 import { logAction } from "@/lib/automationLog";
+import { filesOwnRecords } from "@/lib/types";
 import {
   buildTrainingWorkbook,
   workbookFilename,
@@ -21,6 +22,15 @@ import { listYearSubmissionsWithRecords } from "@/lib/queries/submissions";
  */
 export async function GET(request: Request) {
   const profile = await requireProfile();
+
+  // Returning an empty workbook here would look like lost data rather than an
+  // account that keeps no record of its own.
+  if (!filesOwnRecords(profile.role)) {
+    return NextResponse.json(
+      { error: "This account keeps no training record of its own." },
+      { status: 403 },
+    );
+  }
 
   const url = new URL(request.url);
   const requested = Number(url.searchParams.get("year"));

@@ -31,6 +31,25 @@ export function isReadOnlyRole(role: UserRole): boolean {
   return role === "ceo";
 }
 
+/**
+ * Whether this role keeps a record of their own — a monthly training return and
+ * requests they raise themselves.
+ *
+ * HR administers the process rather than taking part in it, and the CEO neither
+ * submits nor approves, so for both the personal pages would only ever be empty.
+ * Removing them also closes the segregation-of-duties gap where HR approved
+ * their own training record.
+ *
+ * This is an organisational decision, not a privilege boundary: HR remains the
+ * most privileged role and could reverse it from the staff list. It is enforced
+ * in the routes and the server actions, which is the right depth for a rule
+ * about scope rather than security. The CEO's read-only rule is separate and is
+ * enforced in the database as well, because that one is a boundary.
+ */
+export function filesOwnRecords(role: UserRole): boolean {
+  return role === "staff" || role === "hod";
+}
+
 export function isEditableStatus(status: SubmissionStatus): boolean {
   return EDITABLE_STATUSES.includes(status);
 }

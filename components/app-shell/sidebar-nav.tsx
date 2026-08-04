@@ -32,9 +32,11 @@ const NAV_ITEMS: NavItem[] = [
     href: "/training",
     label: "My training",
     icon: NotebookPen,
-    roles: ["staff", "hod", "hr_admin"],
+    roles: ["staff", "hod"],
   },
   {
+    // For staff and a HOD this lists their own; for HR and the CEO it is the
+    // company review queue. Same page, scoped by RLS.
     href: "/requests",
     label: "Requests",
     icon: Inbox,

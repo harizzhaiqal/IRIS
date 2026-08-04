@@ -12,7 +12,7 @@ import {
 import { requireProfile } from "@/lib/auth";
 import { listRequestDepartments, listRequests } from "@/lib/queries/requests";
 import {
-  isReadOnlyRole,
+  filesOwnRecords,
   REQUEST_CATEGORY_ORDER,
   REQUEST_PRIORITY_ORDER,
   REQUEST_STATUS_LABELS,
@@ -76,7 +76,7 @@ export default async function RequestsPage({
   // Reviewers see other people's names; staff only ever see their own, so the
   // requester column and filter would be a column of one repeated value.
   const isReviewer = profile.role !== "staff";
-  const canRaise = !isReadOnlyRole(profile.role);
+  const canRaise = filesOwnRecords(profile.role);
 
   const counts = REQUEST_STATUS_ORDER.map((key) => ({
     key,

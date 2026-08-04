@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { requireProfile } from "@/lib/auth";
-import { isReadOnlyRole } from "@/lib/types";
+import { filesOwnRecords } from "@/lib/types";
 import { RequestForm } from "./request-form";
 
 export const metadata = { title: "New request — IRIS" };
@@ -13,7 +13,7 @@ export default async function NewRequestPage() {
   const profile = await requireProfile();
 
   // Hiding the button is not enough; the route has to refuse the role too.
-  if (isReadOnlyRole(profile.role)) redirect("/requests");
+  if (!filesOwnRecords(profile.role)) redirect("/requests");
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

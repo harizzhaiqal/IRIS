@@ -184,3 +184,14 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **The export route takes a year but never an employee id.** Accepting one would mean defending it; not accepting one means there is nothing to guess at. RLS would filter another employee's rows away in any case, so the parameter would buy nothing.
 
 **No Excel template file was supplied to this session.** The layout follows the written description of IRS-HR-F14 — twelve monthly sheets plus a yearly total, one workbook per employee per year — and the fields the schema already models from that form. If the original workbook is shared, matching it exactly is a change to one file.
+
+
+## Who keeps a record of their own
+
+**HR and the CEO no longer see My training or raise requests.** `filesOwnRecords(role)` is the single rule, used by the sidebar, the routes and the server actions, so the menu and what the routes accept cannot drift apart. `/training`, `/training/new` and `/requests/new` redirect rather than render, and `/training/export` answers 403 — an empty workbook would look like lost data rather than an account that keeps no record.
+
+**HR is removed from the training seed as well.** Leaving them in would have produced a record they can no longer reach. It also closes the segregation-of-duties gap noted earlier in this file: HR previously approved a monthly record they had filed themselves, which in a one-HR company had no second pair of eyes.
+
+**This is enforced in the routes and actions, not in the database, and that is deliberate.** It is an organisational decision about scope, not a privilege boundary — HR remains the most privileged role and could reverse it from the staff list. The CEO's read-only rule is different in kind and is enforced in the policies as well, because that one is a boundary. Conflating the two would have meant either under-enforcing the CEO or hard-coding a reversible HR policy into the schema.
+
+**The test suite counts who files rather than restating it.** Two checks asserted seven employees with records; removing HR made both fail for a reason that had nothing to do with what they were testing. They now read the number from the data, so the next change to who files does not break them.
