@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarOff, NotebookPen, Plus } from "lucide-react";
+import { CalendarOff, FileDown, NotebookPen, Plus } from "lucide-react";
 
 import { EmptyState } from "@/components/training/empty-state";
 import { EntriesTable } from "@/components/training/entries-table";
@@ -101,7 +101,18 @@ export default async function TrainingPage({
           </p>
         </div>
 
-        <MonthPicker month={month} year={year} years={years} />
+        <div className="flex flex-wrap items-center gap-2">
+          <MonthPicker month={month} year={year} years={years} />
+
+          {/* A plain link, not a client action: the response is a file, so the
+              browser's own download handling is what should take it. */}
+          <Button asChild variant="outline" size="sm">
+            <a href={`/training/export?year=${year}`}>
+              <FileDown className="h-4 w-4" />
+              Export {year}
+            </a>
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

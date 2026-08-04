@@ -217,6 +217,29 @@ safe to run repeatedly. Regenerate it after changing a migration:
 npm run sql:repair
 ```
 
+## Excel export
+
+Staff download their own year as form IRS-HR-F14 from the **Export** button on
+`/training`, or directly at `/training/export?year=2026`.
+
+The workbook mirrors the file the Excel process used: twelve monthly sheets and
+a yearly total, one file per employee per year, so a printed export still reads
+like what people used to sign. Each monthly sheet carries the employee header,
+the numbered entries with **both** the calculated and the recorded hours plus the
+reason where they differ, the month total against target, and the HOD and HR
+sign-off. The yearly sheet separates recorded from approved hours and reports
+compliance against the 48-hour standard and the 36-hour threshold.
+
+The route never accepts an employee id — the export is always the caller's own
+record, so there is no id to guess at, and RLS would filter another employee's
+rows away regardless.
+
+To see the layout without running the app:
+
+```bash
+npm run sample:export
+```
+
 ## Request Management (prototype)
 
 A smaller module alongside Training Records, replacing the informal chat-and-email

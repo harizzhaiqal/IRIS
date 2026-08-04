@@ -171,3 +171,16 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **`seed_account` updates the auth row instead of skipping it.** The seed uses fixed uuids so a re-run reuses the same accounts rather than accumulating new ones, and the insert carried `on conflict (id) do nothing`. When the roster moved to `@irs.com.my` those uuids already existed under the old addresses, so the insert did nothing and the email was never changed. The profile advertised `ks@irs.com.my` while Supabase Auth still held `faizal@irssoftware.test`, and nobody could sign in — while the orphan sweep skipped the row, because it did have a profile. The conflict clauses now update the email, password, and profile fields, which is what "the seed owns these accounts" has to mean.
 
 **A rebuild clears `auth.users` entirely rather than by email pattern.** `setup.sql` drops the whole public schema and the seed is the only thing that creates accounts, so anything already in `auth.users` belongs to a previous roster. Filtering by domain kept missing accounts from before a rename. The cost is that an account created by hand outside the seed is removed too, which is stated in the file.
+
+
+## Excel export
+
+**The workbook is built from a plain data shape, not from database rows.** `buildTrainingWorkbook` takes an `ExportInput` of employee, year, months and targets, which means the layout — sheet count, column order, where the totals land, how the override case prints — is unit tested without a database. The route's only job is turning query results into that shape.
+
+**Twelve monthly sheets are always written, including empty ones.** The paper form had twelve tabs and a month with nothing in it is itself information: it says nobody recorded anything, which is exactly what HR is looking for.
+
+**The yearly sheet reports recorded and approved hours in separate columns.** Only approved hours count toward compliance, and a single column would present unverified time as progress — the same rule the dashboards follow, carried into the file someone might print and file.
+
+**The export route takes a year but never an employee id.** Accepting one would mean defending it; not accepting one means there is nothing to guess at. RLS would filter another employee's rows away in any case, so the parameter would buy nothing.
+
+**No Excel template file was supplied to this session.** The layout follows the written description of IRS-HR-F14 — twelve monthly sheets plus a yearly total, one workbook per employee per year — and the fields the schema already models from that form. If the original workbook is shared, matching it exactly is a change to one file.
