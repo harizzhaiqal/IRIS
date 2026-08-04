@@ -101,6 +101,18 @@ check(
   tempTables.map((m) => m[2]).join(", "),
 );
 
+// A permanent table created and dropped inside the same script is the same
+// trap wearing a different hat: run the file in pieces, or have one statement
+// fail, and the rest reads a table that is not there. A scratch table always
+// shows up as a DROP TABLE of something the file itself created, so that is
+// what this looks for.
+const droppedTables = [...rawBundle.matchAll(/drop\s+table\s+(?:if\s+exists\s+)?([\w.]+)/gi)];
+check(
+  "no scratch tables created and dropped mid-script",
+  droppedTables.length === 0,
+  droppedTables.map((m) => m[1]).join(", "),
+);
+
 async function applyBundle(label) {
   console.log(`\n=== ${label} ===`);
   try {

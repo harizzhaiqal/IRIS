@@ -1490,34 +1490,10 @@ select public.seed_account(
 -- comfortably above the 48h standard down to below the 36h threshold.
 -- ---------------------------------------------------------------------------
 
--- A real table rather than a temporary one. Temp tables are session-scoped, and
--- the Supabase SQL Editor does not guarantee a single session across a script,
--- so a temp table can vanish before the generator below reads it. Dropped
--- explicitly at the end of this file.
-create table public.seed_people (
-  idx int,
-  id integer,
-  base_minutes int,
-  catalogue text
-);
-
--- idx drives the deterministic variance below, so it is stated here rather than
--- taken from users.id: the shape of the demo data must not depend on the order
--- the database happened to assign keys in.
-insert into public.seed_people (idx, id, base_minutes, catalogue)
-select v.idx, u.id, v.base_minutes, v.catalogue
-  from (values
-    (0, 'ks@irs.com.my',     315, 'lead'),
-    (1, 'joshua@irs.com.my', 260, 'lead'),
-    (2, 'chen@irs.com.my',   200, 'lead'),
-    (3, 'lee@irs.com.my',    170, 'lead'),
-    (4, 'staff.rnd@irs.com.my',     290, 'engineering'),
-    (5, 'staff.support@irs.com.my', 165, 'support'),
-    -- HR records training of its own too.
-    (6, 'hr@irs.com.my',            235, 'lead')
-  ) as v (idx, email, base_minutes, catalogue)
-  join public.users u on u.email = v.email;
-
+-- The people this generator covers are listed inline in the loop below rather
+-- than staged in a scratch table. A table created and dropped inside a pasted
+-- script is fragile: anything that runs the file in pieces leaves the loop
+-- reading a table that is not there yet, or already gone.
 do $$
 declare
   person record;
@@ -1546,7 +1522,24 @@ declare
 begin
   select id into v_hr from public.users where email = 'hr@irs.com.my';
 
-  for person in select * from public.seed_people order by idx loop
+  -- idx drives the deterministic variance further down, so it is stated here
+  -- rather than taken from users.id: the shape of the demo data must not depend
+  -- on the order the database happened to assign keys in.
+  for person in
+    select v.idx, u.id, v.base_minutes, v.catalogue
+      from (values
+        (0, 'ks@irs.com.my',            315, 'lead'),
+        (1, 'joshua@irs.com.my',        260, 'lead'),
+        (2, 'chen@irs.com.my',          200, 'lead'),
+        (3, 'lee@irs.com.my',           170, 'lead'),
+        (4, 'staff.rnd@irs.com.my',     290, 'engineering'),
+        (5, 'staff.support@irs.com.my', 165, 'support'),
+        -- HR records training of its own too.
+        (6, 'hr@irs.com.my',            235, 'lead')
+      ) as v (idx, email, base_minutes, catalogue)
+      join public.users u on u.email = v.email
+     order by v.idx
+  loop
 
     select hod_id into v_hod from public.users where id = person.id;
 
@@ -1865,8 +1858,6 @@ select
 from public.training_submissions s
 join public.users p on p.id = s.employee_id
 where s.status <> 'draft';
-
-drop table public.seed_people;
 
 drop function public.seed_account(
   uuid, text, text, text, public.user_role, text, text, date
