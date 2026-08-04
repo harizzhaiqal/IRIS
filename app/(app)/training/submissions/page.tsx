@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { requireRole } from "@/lib/auth";
 import { listDepartments } from "@/lib/queries/departments";
-import { listActiveEmployees } from "@/lib/queries/users";
+import { listActiveEmployees } from "@/lib/queries/profiles";
 import { listSubmissions } from "@/lib/queries/submissions";
 import { STATUS_LABELS, type SubmissionStatus } from "@/lib/types";
 import { SubmissionFilters } from "./filters";

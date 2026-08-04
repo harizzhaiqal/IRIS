@@ -4,7 +4,7 @@
 -- Every table in this schema keys on `id integer generated always as identity`,
 -- so ids read 1, 2, 3, 4. The one uuid left in the design is
 -- users.auth_user_id: it points at auth.users, which Supabase Auth owns and
--- keys by uuid, so that column carries the credential link while public.users
+-- keys by uuid, so that column carries the credential link while public.profiles
 -- keeps its own integer key.
 
 -- ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ create table public.departments (
   created_time timestamptz not null default now()
 );
 
-create table public.users (
+create table public.profiles (
   id integer primary key generated always as identity,
   -- The Supabase Auth account behind this person. auth.users is GoTrue's table
   -- and keys by uuid, so the link is a uuid even though this table is not.
@@ -56,20 +56,20 @@ create table public.users (
   date_joined date,
   role public.user_role not null default 'staff',
   department_id integer references public.departments (id) on delete set null,
-  hod_id integer references public.users (id) on delete set null,
+  hod_id integer references public.profiles (id) on delete set null,
   is_active boolean not null default true,
   created_time timestamptz not null default now()
 );
 
 alter table public.departments
   add constraint departments_hod_id_fkey
-  foreign key (hod_id) references public.users (id) on delete set null;
+  foreign key (hod_id) references public.profiles (id) on delete set null;
 
 -- Every request resolves auth.uid() to this row, so the lookup is indexed by
 -- the unique constraint above; these cover the reporting-line queries.
-create index users_department_id_idx on public.users (department_id);
-create index users_hod_id_idx on public.users (hod_id);
-create index users_role_idx on public.users (role);
+create index profiles_department_id_idx on public.profiles (department_id);
+create index profiles_hod_id_idx on public.profiles (hod_id);
+create index profiles_role_idx on public.profiles (role);
 
 -- ---------------------------------------------------------------------------
 -- Application settings
@@ -85,7 +85,7 @@ create table public.app_settings (
   yearly_threshold_hours integer not null default 36,
   submission_deadline_day integer not null default 10,
   reminder_enabled boolean not null default true,
-  updated_by integer references public.users (id) on delete set null,
+  updated_by integer references public.profiles (id) on delete set null,
   modified_time timestamptz not null default now(),
   -- Not an identity column: the row is a singleton, so the key is pinned to 1
   -- rather than counting upward.
@@ -102,17 +102,17 @@ insert into public.app_settings (id) values (1);
 
 create table public.training_submissions (
   id integer primary key generated always as identity,
-  employee_id integer not null references public.users (id) on delete cascade,
+  employee_id integer not null references public.profiles (id) on delete cascade,
   month integer not null check (month between 1 and 12),
   year integer not null check (year between 2000 and 2100),
   status public.submission_status not null default 'draft',
   is_nil_return boolean not null default false,
   submitted_at timestamptz,
   is_late boolean not null default false,
-  hod_verified_by integer references public.users (id) on delete set null,
+  hod_verified_by integer references public.profiles (id) on delete set null,
   hod_verified_at timestamptz,
   hod_comment text,
-  hr_verified_by integer references public.users (id) on delete set null,
+  hr_verified_by integer references public.profiles (id) on delete set null,
   hr_verified_at timestamptz,
   hr_comment text,
   total_minutes integer not null default 0,
@@ -198,7 +198,7 @@ create table public.automation_logs (
   -- and every table in this schema now keys on integer, so one column type
   -- covers them all. related_table says which table the id belongs to.
   related_id integer,
-  performed_by integer references public.users (id) on delete set null,
+  performed_by integer references public.profiles (id) on delete set null,
   is_system boolean not null default false,
   created_time timestamptz not null default now()
 );

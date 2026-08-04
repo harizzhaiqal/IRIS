@@ -36,7 +36,7 @@ export type SubmissionListItem = TrainingSubmission & {
 
 const LIST_SELECT = `
   *,
-  employee:users!training_submissions_employee_id_fkey (
+  employee:profiles!training_submissions_employee_id_fkey (
     id, full_name, designation,
     department:departments ( id, name )
   )
@@ -44,12 +44,12 @@ const LIST_SELECT = `
 
 const DETAIL_SELECT = `
   *,
-  employee:users!training_submissions_employee_id_fkey (
+  employee:profiles!training_submissions_employee_id_fkey (
     id, full_name, email, designation, date_joined, hod_id,
     department:departments ( id, name )
   ),
-  hod_verifier:users!training_submissions_hod_verified_by_fkey ( id, full_name ),
-  hr_verifier:users!training_submissions_hr_verified_by_fkey ( id, full_name ),
+  hod_verifier:profiles!training_submissions_hod_verified_by_fkey ( id, full_name ),
+  hr_verifier:profiles!training_submissions_hr_verified_by_fkey ( id, full_name ),
   records:training_records (
     *,
     attachments:training_attachments ( * )
@@ -114,6 +114,37 @@ export async function listYearSubmissions(
     .order("month");
 
   return data ?? [];
+}
+
+/**
+ * A whole year for one employee, entries included — what the Excel export
+ * needs. Separate from listYearSubmissions, which the dashboards use and which
+ * deliberately does not pull the entries.
+ */
+export async function listYearSubmissionsWithRecords(
+  employeeId: number,
+  year: number,
+): Promise<SubmissionDetail[]> {
+  const supabase = createClient();
+
+  const { data } = await supabase
+    .from("training_submissions")
+    .select(DETAIL_SELECT)
+    .eq("employee_id", employeeId)
+    .eq("year", year)
+    .order("month");
+
+  const rows = (data as unknown as SubmissionDetail[] | null) ?? [];
+
+  // PostgREST returns embedded rows unordered, and the form numbers its entries
+  // down the page.
+  for (const row of rows) {
+    row.records = [...(row.records ?? [])].sort(
+      (a, b) => a.seq_no - b.seq_no || a.id - b.id,
+    );
+  }
+
+  return rows;
 }
 
 /**
@@ -182,7 +213,7 @@ export async function listSubmissions(
   let departmentEmployeeIds: number[] | null = null;
   if (filters.departmentId) {
     const { data: members } = await supabase
-      .from("users")
+      .from("profiles")
       .select("id")
       .eq("department_id", filters.departmentId);
 

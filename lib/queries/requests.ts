@@ -27,7 +27,7 @@ export type RequestDetail = RequestListItem & {
 
 const LIST_SELECT = `
   *,
-  requester:users!requests_requester_id_fkey (
+  requester:profiles!requests_requester_id_fkey (
     id, full_name,
     department:departments ( name )
   )
@@ -35,14 +35,14 @@ const LIST_SELECT = `
 
 const DETAIL_SELECT = `
   *,
-  requester:users!requests_requester_id_fkey (
+  requester:profiles!requests_requester_id_fkey (
     id, full_name,
     department:departments ( name )
   ),
-  reviewer:users!requests_reviewed_by_fkey ( id, full_name ),
+  reviewer:profiles!requests_reviewed_by_fkey ( id, full_name ),
   comments:request_comments (
     id, body, created_time,
-    author:users!request_comments_author_id_fkey ( id, full_name )
+    author:profiles!request_comments_author_id_fkey ( id, full_name )
   )
 `;
 

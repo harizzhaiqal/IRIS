@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { activityLabel, listRecentActivity } from "@/lib/queries/activity";
 import { listDepartments } from "@/lib/queries/departments";
-import { listActiveEmployees } from "@/lib/queries/users";
+import { listActiveEmployees } from "@/lib/queries/profiles";
 import { getTargets } from "@/lib/queries/settings";
 import {
   listSubmissions,

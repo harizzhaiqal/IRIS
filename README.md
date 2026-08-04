@@ -307,17 +307,17 @@ and staff, HODs, and HR all authenticate as the same database role:
   rules hold even if a client bypasses the UI.
 
 Role lookups go through `security definer` helper functions so that policies on
-`users` never select from `users` — that recursion is the usual way Supabase
+`profiles` never select from `profiles` — that recursion is the usual way Supabase
 projects break.
 
-`public.users` holds the staff directory: name, designation, role, department
+`public.profiles` holds the staff directory: name, designation, role, department
 and reporting line. It is distinct from `auth.users`, the Supabase Auth table
-that owns credentials. No password is stored in `public.users`.
+that owns credentials. No password is stored in `public.profiles`.
 
 Every table in the application schema keys on `id integer generated always as
 identity`, so ids read 1, 2, 3, 4. The one exception is the link to Supabase
-Auth: `auth.users` is keyed by uuid, so `public.users.auth_user_id` is a uuid
-referencing `auth.users(id)` while `public.users.id` is the integer key the rest
+Auth: `auth.users` is keyed by uuid, so `public.profiles.auth_user_id` is a uuid
+referencing `auth.users(id)` while `public.profiles.id` is the integer key the rest
 of the schema points at. `public.current_user_id()` resolves the uuid in the
 caller's JWT to that integer, and is the only place the two meet.
 

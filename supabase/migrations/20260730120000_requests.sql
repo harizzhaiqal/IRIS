@@ -58,7 +58,7 @@ $enums$;
 
 create table if not exists public.requests (
   id integer primary key generated always as identity,
-  requester_id integer not null references public.users (id) on delete cascade,
+  requester_id integer not null references public.profiles (id) on delete cascade,
   title text not null,
   description text not null,
   category public.request_category not null default 'other',
@@ -71,7 +71,7 @@ create table if not exists public.requests (
   approval_required boolean not null default true,
   status public.request_status not null default 'submitted',
   ai_suggestion jsonb,
-  reviewed_by integer references public.users (id) on delete set null,
+  reviewed_by integer references public.profiles (id) on delete set null,
   reviewed_at timestamptz,
   review_comment text,
   created_time timestamptz not null default now(),
@@ -102,7 +102,7 @@ create index if not exists requests_created_idx on public.requests (created_time
 create table if not exists public.request_comments (
   id integer primary key generated always as identity,
   request_id integer not null references public.requests (id) on delete cascade,
-  author_id integer not null references public.users (id) on delete cascade,
+  author_id integer not null references public.profiles (id) on delete cascade,
   body text not null,
   created_time timestamptz not null default now(),
   constraint request_comments_body_not_blank check (length(btrim(body)) > 0)

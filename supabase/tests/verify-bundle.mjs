@@ -129,7 +129,7 @@ async function applyBundle(label) {
 
   const counts = {};
   for (const table of [
-    "users",
+    "profiles",
     "departments",
     "training_submissions",
     "training_records",
@@ -160,7 +160,7 @@ const first = await applyBundle("First run (fresh database)");
 {
   const { rows } = await db.query(`
     select count(*)::int as n from auth.users a
-     left join public.users u on u.auth_user_id = a.id
+     left join public.profiles u on u.auth_user_id = a.id
      where u.id is null
   `);
   check("no auth account is left without a profile", rows[0].n === 0,
@@ -171,7 +171,7 @@ const first = await applyBundle("First run (fresh database)");
   check("an account from the previous roster is removed", ghost[0].n === 0);
 }
 
-check("8 users seeded", first.users === 8, `got ${first.users}`);
+check("8 profiles seeded", first.profiles === 8, `got ${first.profiles}`);
 check("7 departments seeded", first.departments === 7, `got ${first.departments}`);
 check("submissions seeded", first.training_submissions > 50, `got ${first.training_submissions}`);
 check("training entries seeded", first.training_records > 100, `got ${first.training_records}`);
@@ -208,7 +208,7 @@ check(
   idTypes.map((r) => `${r.table_name}=${r.data_type}`).join(", "),
 );
 
-for (const table of ["users", "departments", "training_submissions", "training_records"]) {
+for (const table of ["profiles", "departments", "training_submissions", "training_records"]) {
   const { rows } = await db.query(`
     select min(id)::int as lo, max(id)::int as hi, count(*)::int as n
       from public.${table}
@@ -220,11 +220,11 @@ for (const table of ["users", "departments", "training_submissions", "training_r
   );
 }
 
-// The one uuid the design keeps: public.users points at auth.users, which
+// The one uuid the design keeps: public.profiles points at auth.users, which
 // Supabase Auth owns and keys by uuid. Every row must carry that link, or the
 // user exists in the directory and cannot sign in.
 const { rows: links } = await db.query(`
-  select count(*)::int as n from public.users u
+  select count(*)::int as n from public.profiles u
    join auth.users a on a.id = u.auth_user_id
 `);
 check("every profile links to an auth account", links[0].n === 8, `got ${links[0].n}`);

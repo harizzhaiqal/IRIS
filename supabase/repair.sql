@@ -120,7 +120,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select id from public.users where auth_user_id = auth.uid();
+  select id from public.profiles where auth_user_id = auth.uid();
 $$;
 
 create or replace function public.current_user_role()
@@ -130,7 +130,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select role from public.users where auth_user_id = auth.uid();
+  select role from public.profiles where auth_user_id = auth.uid();
 $$;
 
 create or replace function public.is_hr_admin()
@@ -154,7 +154,7 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.users
+    select 1 from public.profiles
      where auth_user_id = auth.uid() and role = 'ceo'
   );
 $$;
@@ -167,7 +167,7 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.users
+    select 1 from public.profiles
      where id = employee and hod_id = public.current_user_id()
   );
 $$;
@@ -244,7 +244,7 @@ grant execute on function public.can_edit_submission(integer) to authenticated;
 -- Enable RLS everywhere.
 -- ---------------------------------------------------------------------------
 
-alter table public.users enable row level security;
+alter table public.profiles enable row level security;
 
 alter table public.departments enable row level security;
 
@@ -258,7 +258,7 @@ alter table public.training_attachments enable row level security;
 
 alter table public.automation_logs enable row level security;
 
-drop policy if exists users_select_authenticated on public.users;
+drop policy if exists profiles_select_authenticated on public.profiles;
 
 -- ---------------------------------------------------------------------------
 -- users
@@ -267,31 +267,31 @@ drop policy if exists users_select_authenticated on public.users;
 -- Staff names, designations, and departments act as an internal directory:
 -- every signed-in user needs them to render HOD names in verification trails
 -- and reviewer names on submissions. Reads are open; writes are not.
-create policy users_select_authenticated on public.users
+create policy profiles_select_authenticated on public.profiles
   for select to authenticated
   using (true);
 
-drop policy if exists users_update_own on public.users;
+drop policy if exists profiles_update_own on public.profiles;
 
 -- A user may maintain their own profile. Matched on auth_user_id rather than
 -- id, so the check reads straight from the JWT with no lookup. Role and
 -- reporting line are locked down separately by the
--- users_guard_privileged_fields trigger.
-create policy users_update_own on public.users
+-- profiles_guard_privileged_fields trigger.
+create policy profiles_update_own on public.profiles
   for update to authenticated
   using (auth_user_id = auth.uid())
   with check (auth_user_id = auth.uid());
 
-drop policy if exists users_all_hr_admin on public.users;
+drop policy if exists profiles_all_hr_admin on public.profiles;
 
 -- Only HR administers the staff list.
-create policy users_all_hr_admin on public.users
+create policy profiles_all_hr_admin on public.profiles
   for all to authenticated
   using (public.is_hr_admin())
   with check (public.is_hr_admin());
 
 -- Stops a user escalating their own role or reassigning their reporting line
--- through the users_update_own policy.
+-- through the profiles_update_own policy.
 create or replace function public.guard_profile_privileged_fields()
 returns trigger
 language plpgsql
@@ -320,10 +320,10 @@ begin
 end;
 $$;
 
-drop trigger if exists users_guard_privileged_fields on public.users;
+drop trigger if exists profiles_guard_privileged_fields on public.profiles;
 
-create trigger users_guard_privileged_fields
-  before update on public.users
+create trigger profiles_guard_privileged_fields
+  before update on public.profiles
   for each row execute function public.guard_profile_privileged_fields();
 
 drop policy if exists departments_select_authenticated on public.departments;

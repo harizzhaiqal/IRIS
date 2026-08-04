@@ -7,7 +7,7 @@ export type RequestStatus = Enums<"request_status">;
 export type RequestCategory = Enums<"request_category">;
 export type RequestPriority = Enums<"request_priority">;
 
-export type Profile = Tables<"users">;
+export type Profile = Tables<"profiles">;
 export type Department = Tables<"departments">;
 export type AppSettings = Tables<"app_settings">;
 export type TrainingSubmission = Tables<"training_submissions">;

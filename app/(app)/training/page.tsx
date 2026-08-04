@@ -17,7 +17,7 @@ import {
 import { redirect } from "next/navigation";
 
 import { requireProfile } from "@/lib/auth";
-import { getProfileName } from "@/lib/queries/users";
+import { getProfileName } from "@/lib/queries/profiles";
 import { getTargets } from "@/lib/queries/settings";
 import {
   getSubmissionForMonth,

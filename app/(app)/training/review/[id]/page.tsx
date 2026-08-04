@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireProfile } from "@/lib/auth";
-import { getProfileName } from "@/lib/queries/users";
+import { getProfileName } from "@/lib/queries/profiles";
 import { getTargets } from "@/lib/queries/settings";
 import { getSubmissionById } from "@/lib/queries/submissions";
 import { minutesToHHMM } from "@/lib/utils/duration";

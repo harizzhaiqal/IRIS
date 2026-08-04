@@ -58,13 +58,18 @@ begin
 end
 $bundle$;
 
--- The seed recreates the demo accounts; clear any previous run's first.
--- Identities go first: they hold a foreign key to auth.users. They are matched
--- through that key rather than provider_id, which stores the user's uuid.
-delete from auth.identities
-where user_id in (select id from auth.users where email like '%@irs.com.my');
-
-delete from auth.users where email like '%@irs.com.my';
+-- Every sign-in account is removed, not just the ones matching a name pattern.
+--
+-- This file rebuilds the whole public schema, and the seed below is the only
+-- thing that creates accounts, so anything already in auth.users is from a
+-- previous roster. Filtering by email domain missed accounts from before a
+-- rename and left people unable to sign in with the address their profile
+-- advertised.
+--
+-- If you have created an account by hand that the seed does not know about, it
+-- goes too. Identities first: they hold a foreign key to auth.users.
+delete from auth.identities;
+delete from auth.users;
 `;
 
 const footer = `
@@ -72,7 +77,7 @@ const footer = `
 -- ===========================================================================
 -- Remove auth accounts left over from an earlier roster.
 --
--- The rebuild above dropped public.users and the seed has just recreated
+-- The rebuild above dropped public.profiles and the seed has just recreated
 -- exactly the accounts that belong, so anything still in auth.users without a
 -- profile is from a previous run under a different name or email domain.
 --
@@ -89,13 +94,13 @@ delete from auth.identities
 where user_id in (
   select a.id
     from auth.users a
-    left join public.users u on u.auth_user_id = a.id
+    left join public.profiles u on u.auth_user_id = a.id
    where u.id is null
 );
 
 delete from auth.users as a
 where not exists (
-  select 1 from public.users u where u.auth_user_id = a.id
+  select 1 from public.profiles u where u.auth_user_id = a.id
 );
 `;
 

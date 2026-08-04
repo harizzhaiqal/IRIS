@@ -60,7 +60,7 @@ async function expectError(name, fn, expectedFragment) {
 // SET LOCAL would be a no-op here: PGlite autocommits each statement, so the
 // setting must be session-scoped to survive into the next query.
 //
-// Impersonation is by auth uuid, not by public.users.id: that is what a real
+// Impersonation is by auth uuid, not by public.profiles.id: that is what a real
 // JWT carries and what auth.uid() returns. Resolving it to the integer profile
 // id is the schema's job, and these tests exercise that crossing rather than
 // bypassing it.
@@ -78,7 +78,7 @@ async function asUser(authUid, fn) {
 /** The auth uuid behind an integer profile id, for impersonating a seeded row. */
 async function authUidFor(profileId) {
   const { rows } = await db.query(
-    `select auth_user_id from public.users where id = $1`,
+    `select auth_user_id from public.profiles where id = $1`,
     [profileId],
   );
   return rows[0].auth_user_id;
@@ -175,7 +175,7 @@ try {
 // once did not, relying on Supabase's schema default privileges, and a grant in
 // this block hid that for every test below.
 await db.exec(`
-  alter table public.users force row level security;
+  alter table public.profiles force row level security;
   alter table public.training_submissions force row level security;
   alter table public.training_records force row level security;
   alter table public.training_attachments force row level security;
@@ -225,7 +225,7 @@ const EMAIL = {
 
 const uid = {};
 {
-  const { rows } = await db.query(`select email, id, auth_user_id from public.users`);
+  const { rows } = await db.query(`select email, id, auth_user_id from public.profiles`);
   const byEmail = new Map(rows.map((r) => [r.email, r]));
 
   for (const [person, email] of Object.entries(EMAIL)) {
@@ -247,7 +247,7 @@ const uid = {};
 
   // The point of the whole change: keys read 1, 2, 3, 4 rather than uuids.
   for (const table of [
-    "users",
+    "profiles",
     "departments",
     "training_submissions",
     "training_records",
@@ -290,7 +290,7 @@ const uid = {};
 console.log("\n=== Seed shape ===");
 {
   const roles = await db.query(
-    `select role, count(*)::int as n from public.users group by role order by role`,
+    `select role, count(*)::int as n from public.profiles group by role order by role`,
   );
   const byRole = Object.fromEntries(roles.rows.map((r) => [r.role, r.n]));
   check("1 hr_admin, 4 hods, 2 staff, 1 ceo",
@@ -668,23 +668,23 @@ console.log("\n=== Privilege escalation ===");
 {
   await asUser(AUTH_UID.staffRnd, async () => {
     await expectError("staff cannot promote themselves", () =>
-      db.query(`update public.users set role = 'hr_admin' where id = $1`, [uid.staffRnd]),
+      db.query(`update public.profiles set role = 'hr_admin' where id = $1`, [uid.staffRnd]),
       "only hr can change role");
 
     await expectError("staff cannot reassign their reporting line", () =>
-      db.query(`update public.users set hod_id = null where id = $1`, [uid.staffRnd]),
+      db.query(`update public.profiles set hod_id = null where id = $1`, [uid.staffRnd]),
       "only hr can change role");
 
     // Rebinding the credential link would hand this account to someone else,
     // so it is guarded separately from the HR-owned fields above.
     await expectError("staff cannot repoint their profile at another account", () =>
       db.query(
-        `update public.users set auth_user_id = $2 where id = $1`,
+        `update public.profiles set auth_user_id = $2 where id = $1`,
         [uid.staffRnd, AUTH_UID.staffSupport]),
       "cannot be reassigned");
 
     const res = await db.query(
-      `update public.users set designation = 'Principal Engineer' where id = $1 returning designation`,
+      `update public.profiles set designation = 'Principal Engineer' where id = $1 returning designation`,
       [uid.staffRnd]);
     check("staff may still edit their own designation", res.rows[0]?.designation === "Principal Engineer");
   });
@@ -841,7 +841,7 @@ console.log("\n=== Requests: visibility ===");
     // Faizal heads Software Development, so he sees his team's and his own.
     const team = await db.query(`
       select count(*)::int as n from public.requests r
-      join public.users u on u.id = r.requester_id
+      join public.profiles u on u.id = r.requester_id
       where u.hod_id is distinct from $1 and r.requester_id <> $2`,
       [uid.ks, uid.ks]);
     check("a hod sees only their team's requests and their own",
@@ -958,7 +958,7 @@ console.log("\n=== CEO: reads everything ===");
   const trueRequestCount = totals[0].n;
 
   await asUser(AUTH_UID.ceo, async () => {
-    const people = await db.query(`select count(*)::int as n from public.users`);
+    const people = await db.query(`select count(*)::int as n from public.profiles`);
     check("ceo sees the whole staff directory", people.rows[0].n === 8, `${people.rows[0].n}`);
 
     const subs = await db.query(

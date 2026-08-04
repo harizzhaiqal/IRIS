@@ -77,7 +77,7 @@ console.log("  migrations and seed applied");
 
 // Data the user typed in, which must survive the repair.
 const subject = await db.query(
-  `select id, auth_user_id from public.users where email = 'staff.rnd@irs.com.my'`,
+  `select id, auth_user_id from public.profiles where email = 'staff.rnd@irs.com.my'`,
 );
 const uid = subject.rows[0].id;
 const authUid = subject.rows[0].auth_user_id;
@@ -98,7 +98,7 @@ await db.query(
 
 const before = await db.query(`
   select
-    (select count(*)::int from public.users) as users,
+    (select count(*)::int from public.profiles) as users,
     (select count(*)::int from public.training_submissions) as submissions,
     (select count(*)::int from public.training_records) as records
 `);
@@ -108,35 +108,35 @@ console.log("\n=== Break it the way a dashboard rename does ===");
 // The real sequence, because Postgres validates a LANGUAGE SQL body when the
 // function is created: the helpers have to be written while the old table name
 // still exists, and only then does the rename strand them.
-await db.exec(`alter table public.users rename to profiles;`);
+await db.exec(`alter table public.profiles rename to users;`);
 
 await db.exec(`
   create or replace function public.current_user_role()
   returns public.user_role language sql stable security definer
   set search_path = public as $fn$
-    select role from public.profiles where auth_user_id = auth.uid();
+    select role from public.users where auth_user_id = auth.uid();
   $fn$;
 
   create or replace function public.is_hr_admin()
   returns boolean language sql stable security definer
   set search_path = public as $fn$
-    select exists (select 1 from public.profiles
+    select exists (select 1 from public.users
                     where auth_user_id = auth.uid() and role = 'hr_admin');
   $fn$;
 `);
 
-// The dashboard's rename button. The table is now correctly called users; the
-// two functions above still say profiles, and nothing rewrote them.
-await db.exec(`alter table public.profiles rename to users;`);
+// The dashboard's rename button, putting it back. The table is correctly named
+// again; the two functions above still say users, and nothing rewrote them.
+await db.exec(`alter table public.users rename to profiles;`);
 
 // A policy lost along the way, as happens when tables are edited by hand.
-await db.exec(`drop policy if exists users_select_authenticated on public.users;`);
+await db.exec(`drop policy if exists profiles_select_authenticated on public.profiles;`);
 
 async function readOwnProfile() {
   await db.exec(`select set_config('iris.user_id', '${authUid}', false);`);
   await db.exec(`set role authenticated;`);
   try {
-    const r = await db.query(`select id from public.users where auth_user_id = $1`, [authUid]);
+    const r = await db.query(`select id from public.profiles where auth_user_id = $1`, [authUid]);
     return { ok: true, rows: r.rows.length };
   } catch (e) {
     return { ok: false, message: e.message };
@@ -148,7 +148,7 @@ async function readOwnProfile() {
 const broken = await readOwnProfile();
 check(
   "the break reproduces the reported failure",
-  !broken.ok && /public\.profiles.*does not exist/.test(broken.message),
+  !broken.ok && /public\.users.*does not exist/.test(broken.message),
   broken.ok ? "query unexpectedly succeeded" : broken.message,
 );
 
@@ -162,7 +162,7 @@ check("reads work again after the repair", fixed.ok && fixed.rows === 1,
 
 const after = await db.query(`
   select
-    (select count(*)::int from public.users) as users,
+    (select count(*)::int from public.profiles) as users,
     (select count(*)::int from public.training_submissions) as submissions,
     (select count(*)::int from public.training_records) as records
 `);
@@ -177,8 +177,8 @@ check("the hand-typed entry is still there", kept.rows.length === 1);
 
 const policy = await db.query(`
   select count(*)::int as n from pg_policies
-   where schemaname = 'public' and tablename = 'users'
-     and policyname = 'users_select_authenticated'
+   where schemaname = 'public' and tablename = 'profiles'
+     and policyname = 'profiles_select_authenticated'
 `);
 check("the dropped policy was restored", policy.rows[0].n === 1);
 
@@ -187,7 +187,7 @@ console.log("\n=== Run it a second time ===");
 await db.exec(strip(read("supabase/repair.sql")));
 const twice = await db.query(`
   select
-    (select count(*)::int from public.users) as users,
+    (select count(*)::int from public.profiles) as users,
     (select count(*)::int from public.training_submissions) as submissions,
     (select count(*)::int from public.training_records) as records
 `);

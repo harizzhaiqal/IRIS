@@ -56,7 +56,7 @@ export type Database = {
             foreignKeyName: "app_settings_updated_by_fkey";
             columns: ["updated_by"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -97,7 +97,7 @@ export type Database = {
             foreignKeyName: "automation_logs_performed_by_fkey";
             columns: ["performed_by"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -126,12 +126,12 @@ export type Database = {
             foreignKeyName: "departments_hod_id_fkey";
             columns: ["hod_id"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
       };
-      users: {
+      profiles: {
         Row: {
           id: number;
           auth_user_id: string;
@@ -173,24 +173,24 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "users_auth_user_id_fkey";
+            foreignKeyName: "profiles_auth_user_id_fkey";
             columns: ["auth_user_id"];
             isOneToOne: true;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "users_department_id_fkey";
+            foreignKeyName: "profiles_department_id_fkey";
             columns: ["department_id"];
             isOneToOne: false;
             referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "users_hod_id_fkey";
+            foreignKeyName: "profiles_hod_id_fkey";
             columns: ["hod_id"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -261,14 +261,14 @@ export type Database = {
             foreignKeyName: "requests_requester_id_fkey";
             columns: ["requester_id"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
           {
             foreignKeyName: "requests_reviewed_by_fkey";
             columns: ["reviewed_by"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -307,7 +307,7 @@ export type Database = {
             foreignKeyName: "request_comments_author_id_fkey";
             columns: ["author_id"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -478,21 +478,21 @@ export type Database = {
             foreignKeyName: "training_submissions_employee_id_fkey";
             columns: ["employee_id"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
           {
             foreignKeyName: "training_submissions_hod_verified_by_fkey";
             columns: ["hod_verified_by"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
           {
             foreignKeyName: "training_submissions_hr_verified_by_fkey";
             columns: ["hr_verified_by"];
             isOneToOne: false;
-            referencedRelation: "users";
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];

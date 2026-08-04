@@ -42,13 +42,18 @@ begin
 end
 $bundle$;
 
--- The seed recreates the demo accounts; clear any previous run's first.
--- Identities go first: they hold a foreign key to auth.users. They are matched
--- through that key rather than provider_id, which stores the user's uuid.
-delete from auth.identities
-where user_id in (select id from auth.users where email like '%@irs.com.my');
-
-delete from auth.users where email like '%@irs.com.my';
+-- Every sign-in account is removed, not just the ones matching a name pattern.
+--
+-- This file rebuilds the whole public schema, and the seed below is the only
+-- thing that creates accounts, so anything already in auth.users is from a
+-- previous roster. Filtering by email domain missed accounts from before a
+-- rename and left people unable to sign in with the address their profile
+-- advertised.
+--
+-- If you have created an account by hand that the seed does not know about, it
+-- goes too. Identities first: they hold a foreign key to auth.users.
+delete from auth.identities;
+delete from auth.users;
 
 
 -- ===========================================================================
@@ -61,7 +66,7 @@ delete from auth.users where email like '%@irs.com.my';
 -- Every table in this schema keys on `id integer generated always as identity`,
 -- so ids read 1, 2, 3, 4. The one uuid left in the design is
 -- users.auth_user_id: it points at auth.users, which Supabase Auth owns and
--- keys by uuid, so that column carries the credential link while public.users
+-- keys by uuid, so that column carries the credential link while public.profiles
 -- keeps its own integer key.
 
 -- ---------------------------------------------------------------------------
@@ -102,7 +107,7 @@ create table public.departments (
   created_time timestamptz not null default now()
 );
 
-create table public.users (
+create table public.profiles (
   id integer primary key generated always as identity,
   -- The Supabase Auth account behind this person. auth.users is GoTrue's table
   -- and keys by uuid, so the link is a uuid even though this table is not.
@@ -113,20 +118,20 @@ create table public.users (
   date_joined date,
   role public.user_role not null default 'staff',
   department_id integer references public.departments (id) on delete set null,
-  hod_id integer references public.users (id) on delete set null,
+  hod_id integer references public.profiles (id) on delete set null,
   is_active boolean not null default true,
   created_time timestamptz not null default now()
 );
 
 alter table public.departments
   add constraint departments_hod_id_fkey
-  foreign key (hod_id) references public.users (id) on delete set null;
+  foreign key (hod_id) references public.profiles (id) on delete set null;
 
 -- Every request resolves auth.uid() to this row, so the lookup is indexed by
 -- the unique constraint above; these cover the reporting-line queries.
-create index users_department_id_idx on public.users (department_id);
-create index users_hod_id_idx on public.users (hod_id);
-create index users_role_idx on public.users (role);
+create index profiles_department_id_idx on public.profiles (department_id);
+create index profiles_hod_id_idx on public.profiles (hod_id);
+create index profiles_role_idx on public.profiles (role);
 
 -- ---------------------------------------------------------------------------
 -- Application settings
@@ -142,7 +147,7 @@ create table public.app_settings (
   yearly_threshold_hours integer not null default 36,
   submission_deadline_day integer not null default 10,
   reminder_enabled boolean not null default true,
-  updated_by integer references public.users (id) on delete set null,
+  updated_by integer references public.profiles (id) on delete set null,
   modified_time timestamptz not null default now(),
   -- Not an identity column: the row is a singleton, so the key is pinned to 1
   -- rather than counting upward.
@@ -159,17 +164,17 @@ insert into public.app_settings (id) values (1);
 
 create table public.training_submissions (
   id integer primary key generated always as identity,
-  employee_id integer not null references public.users (id) on delete cascade,
+  employee_id integer not null references public.profiles (id) on delete cascade,
   month integer not null check (month between 1 and 12),
   year integer not null check (year between 2000 and 2100),
   status public.submission_status not null default 'draft',
   is_nil_return boolean not null default false,
   submitted_at timestamptz,
   is_late boolean not null default false,
-  hod_verified_by integer references public.users (id) on delete set null,
+  hod_verified_by integer references public.profiles (id) on delete set null,
   hod_verified_at timestamptz,
   hod_comment text,
-  hr_verified_by integer references public.users (id) on delete set null,
+  hr_verified_by integer references public.profiles (id) on delete set null,
   hr_verified_at timestamptz,
   hr_comment text,
   total_minutes integer not null default 0,
@@ -255,7 +260,7 @@ create table public.automation_logs (
   -- and every table in this schema now keys on integer, so one column type
   -- covers them all. related_table says which table the id belongs to.
   related_id integer,
-  performed_by integer references public.users (id) on delete set null,
+  performed_by integer references public.profiles (id) on delete set null,
   is_system boolean not null default false,
   created_time timestamptz not null default now()
 );
@@ -361,7 +366,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select id from public.users where auth_user_id = auth.uid();
+  select id from public.profiles where auth_user_id = auth.uid();
 $$;
 
 create or replace function public.current_user_role()
@@ -371,7 +376,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select role from public.users where auth_user_id = auth.uid();
+  select role from public.profiles where auth_user_id = auth.uid();
 $$;
 
 create or replace function public.is_hr_admin()
@@ -395,7 +400,7 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.users
+    select 1 from public.profiles
      where auth_user_id = auth.uid() and role = 'ceo'
   );
 $$;
@@ -408,7 +413,7 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from public.users
+    select 1 from public.profiles
      where id = employee and hod_id = public.current_user_id()
   );
 $$;
@@ -473,7 +478,7 @@ grant execute on function public.can_edit_submission(integer) to authenticated;
 -- Enable RLS everywhere.
 -- ---------------------------------------------------------------------------
 
-alter table public.users enable row level security;
+alter table public.profiles enable row level security;
 alter table public.departments enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.training_submissions enable row level security;
@@ -488,27 +493,27 @@ alter table public.automation_logs enable row level security;
 -- Staff names, designations, and departments act as an internal directory:
 -- every signed-in user needs them to render HOD names in verification trails
 -- and reviewer names on submissions. Reads are open; writes are not.
-create policy users_select_authenticated on public.users
+create policy profiles_select_authenticated on public.profiles
   for select to authenticated
   using (true);
 
 -- A user may maintain their own profile. Matched on auth_user_id rather than
 -- id, so the check reads straight from the JWT with no lookup. Role and
 -- reporting line are locked down separately by the
--- users_guard_privileged_fields trigger.
-create policy users_update_own on public.users
+-- profiles_guard_privileged_fields trigger.
+create policy profiles_update_own on public.profiles
   for update to authenticated
   using (auth_user_id = auth.uid())
   with check (auth_user_id = auth.uid());
 
 -- Only HR administers the staff list.
-create policy users_all_hr_admin on public.users
+create policy profiles_all_hr_admin on public.profiles
   for all to authenticated
   using (public.is_hr_admin())
   with check (public.is_hr_admin());
 
 -- Stops a user escalating their own role or reassigning their reporting line
--- through the users_update_own policy.
+-- through the profiles_update_own policy.
 create or replace function public.guard_profile_privileged_fields()
 returns trigger
 language plpgsql
@@ -537,8 +542,8 @@ begin
 end;
 $$;
 
-create trigger users_guard_privileged_fields
-  before update on public.users
+create trigger profiles_guard_privileged_fields
+  before update on public.profiles
   for each row execute function public.guard_profile_privileged_fields();
 
 -- ---------------------------------------------------------------------------
@@ -979,7 +984,7 @@ $enums$;
 
 create table if not exists public.requests (
   id integer primary key generated always as identity,
-  requester_id integer not null references public.users (id) on delete cascade,
+  requester_id integer not null references public.profiles (id) on delete cascade,
   title text not null,
   description text not null,
   category public.request_category not null default 'other',
@@ -992,7 +997,7 @@ create table if not exists public.requests (
   approval_required boolean not null default true,
   status public.request_status not null default 'submitted',
   ai_suggestion jsonb,
-  reviewed_by integer references public.users (id) on delete set null,
+  reviewed_by integer references public.profiles (id) on delete set null,
   reviewed_at timestamptz,
   review_comment text,
   created_time timestamptz not null default now(),
@@ -1023,7 +1028,7 @@ create index if not exists requests_created_idx on public.requests (created_time
 create table if not exists public.request_comments (
   id integer primary key generated always as identity,
   request_id integer not null references public.requests (id) on delete cascade,
-  author_id integer not null references public.users (id) on delete cascade,
+  author_id integer not null references public.profiles (id) on delete cascade,
   body text not null,
   created_time timestamptz not null default now(),
   constraint request_comments_body_not_blank check (length(btrim(body)) > 0)
@@ -1298,7 +1303,7 @@ create policy request_attachments_storage_delete on storage.objects
 -- rejected, overdue, and nil return. Monthly hours vary widely enough that the
 -- compliance dashboard shows genuine spread rather than a flat line.
 --
--- public.users.id, public.departments.id and every other key in this schema is
+-- public.profiles.id, public.departments.id and every other key in this schema is
 -- generated by the database, so nothing here can name an id up front. Rows are
 -- resolved by email for people and by name for departments — the two natural
 -- keys the schema already declares unique. The auth.users uuids stay literal:
@@ -1344,7 +1349,15 @@ begin
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('full_name', p_full_name)
   )
-  on conflict (id) do nothing;
+  -- Updated, not skipped. The uuids here are fixed so a re-run reuses the same
+  -- accounts, which means a row for this uuid may already exist under an older
+  -- email. DO NOTHING would leave that stale address in place, and the person
+  -- could no longer sign in with the address the profile advertises.
+  on conflict (id) do update
+    set email = excluded.email,
+        encrypted_password = excluded.encrypted_password,
+        raw_user_meta_data = excluded.raw_user_meta_data,
+        updated_at = now();
 
   insert into auth.identities (
     id, user_id, identity_data, provider, provider_id,
@@ -1355,21 +1368,30 @@ begin
     'email', p_auth_id::text,
     now(), now(), now()
   )
-  on conflict do nothing;
+  on conflict (provider, provider_id) do update
+    set identity_data = excluded.identity_data,
+        updated_at = now();
 
-  insert into public.users (
+  insert into public.profiles (
     auth_user_id, full_name, email, designation, date_joined,
     role, department_id, hod_id, is_active
   ) values (
     p_auth_id, p_full_name, p_email, p_designation, p_date_joined,
     p_role,
     (select id from public.departments where name = p_department_name),
-    (select id from public.users where email = p_hod_email),
+    (select id from public.profiles where email = p_hod_email),
     true
   )
-  on conflict (email) do nothing;
+  on conflict (auth_user_id) do update
+    set email = excluded.email,
+        full_name = excluded.full_name,
+        designation = excluded.designation,
+        role = excluded.role,
+        department_id = excluded.department_id,
+        hod_id = excluded.hod_id,
+        is_active = true;
 
-  select id into v_user_id from public.users where email = p_email;
+  select id into v_user_id from public.profiles where auth_user_id = p_auth_id;
   return v_user_id;
 end;
 $$;
@@ -1417,37 +1439,37 @@ select public.seed_account(
 -- A HOD files a monthly record too, and that record still needs a HOD stage
 -- before it reaches HR. They are paired so each is verified by another HOD:
 -- the CEO cannot do it, because the CEO approves nothing.
-update public.users
-   set hod_id = (select id from public.users where email = 'joshua@irs.com.my')
+update public.profiles
+   set hod_id = (select id from public.profiles where email = 'joshua@irs.com.my')
  where email = 'ks@irs.com.my';
 
-update public.users
-   set hod_id = (select id from public.users where email = 'ks@irs.com.my')
+update public.profiles
+   set hod_id = (select id from public.profiles where email = 'ks@irs.com.my')
  where email = 'joshua@irs.com.my';
 
-update public.users
-   set hod_id = (select id from public.users where email = 'lee@irs.com.my')
+update public.profiles
+   set hod_id = (select id from public.profiles where email = 'lee@irs.com.my')
  where email = 'chen@irs.com.my';
 
-update public.users
-   set hod_id = (select id from public.users where email = 'chen@irs.com.my')
+update public.profiles
+   set hod_id = (select id from public.profiles where email = 'chen@irs.com.my')
  where email = 'lee@irs.com.my';
 
 -- Joshua heads four departments; the others head one each.
 update public.departments
-   set hod_id = (select id from public.users where email = 'ks@irs.com.my')
+   set hod_id = (select id from public.profiles where email = 'ks@irs.com.my')
  where name = 'R&D';
 
 update public.departments
-   set hod_id = (select id from public.users where email = 'joshua@irs.com.my')
+   set hod_id = (select id from public.profiles where email = 'joshua@irs.com.my')
  where name in ('Support', 'Sales', 'Admin', 'Support Engineer');
 
 update public.departments
-   set hod_id = (select id from public.users where email = 'chen@irs.com.my')
+   set hod_id = (select id from public.profiles where email = 'chen@irs.com.my')
  where name = 'Finance';
 
 update public.departments
-   set hod_id = (select id from public.users where email = 'lee@irs.com.my')
+   set hod_id = (select id from public.profiles where email = 'lee@irs.com.my')
  where name = 'HR';
 
 -- HR administers the system and sits in the HR department, so their own
@@ -1520,7 +1542,7 @@ declare
   v_effectiveness public.training_effectiveness;
   v_variance int;
 begin
-  select id into v_hr from public.users where email = 'hr@irs.com.my';
+  select id into v_hr from public.profiles where email = 'hr@irs.com.my';
 
   -- idx drives the deterministic variance further down, so it is stated here
   -- rather than taken from users.id: the shape of the demo data must not depend
@@ -1537,11 +1559,11 @@ begin
         -- HR records training of its own too.
         (6, 'hr@irs.com.my',            235, 'lead')
       ) as v (idx, email, base_minutes, catalogue)
-      join public.users u on u.email = v.email
+      join public.profiles u on u.email = v.email
      order by v.idx
   loop
 
-    select hod_id into v_hod from public.users where id = person.id;
+    select hod_id into v_hod from public.profiles where id = person.id;
 
     v_titles := case person.catalogue
       when 'engineering' then array[
@@ -1757,7 +1779,7 @@ declare
 begin
   select s.id into v_submission
     from public.training_submissions s
-    join public.users u on u.id = s.employee_id
+    join public.profiles u on u.id = s.employee_id
    where u.email = 'ks@irs.com.my'
      and s.month = 2 and s.year = 2026;
 
@@ -1797,7 +1819,7 @@ declare
 begin
   select s.id into v_submission
     from public.training_submissions s
-    join public.users u on u.id = s.employee_id
+    join public.profiles u on u.id = s.employee_id
    where u.email = 'ks@irs.com.my'
      and s.month = 4 and s.year = 2026;
 
@@ -1856,7 +1878,7 @@ select
   false,
   coalesce(s.hr_verified_at, s.hod_verified_at, s.submitted_at, s.created_time)
 from public.training_submissions s
-join public.users p on p.id = s.employee_id
+join public.profiles p on p.id = s.employee_id
 where s.status <> 'draft';
 
 drop function public.seed_account(
@@ -1876,81 +1898,81 @@ insert into public.requests (
   attachment_name, priority, assigned_department, approval_required, status,
   ai_suggestion, reviewed_by, reviewed_at, review_comment, created_time
 ) values
-  ((select id from public.users where email = 'ks@irs.com.my'),
+  ((select id from public.profiles where email = 'ks@irs.com.my'),
    'Second monitor for development work',
    'I need a new monitor because my current monitor is too small for reviewing code side by side.',
    'it_equipment', 89000, null, 'normal', 'IT', true, 'approved',
    '{"category":"it_equipment","department":"IT","priority":"normal","approvalRequired":true,"reason":"Equipment purchase usually requires manager or admin approval."}'::jsonb,
-   (select id from public.users where email = 'hr@irs.com.my'),
+   (select id from public.profiles where email = 'hr@irs.com.my'),
    now() - interval '26 days', 'Approved. Collect from the IT store room.',
    now() - interval '28 days'),
 
-  ((select id from public.users where email = 'joshua@irs.com.my'),
+  ((select id from public.profiles where email = 'joshua@irs.com.my'),
    'Laptop will not power on',
    'My laptop is broken and will not start, I cannot work until it is repaired.',
    'it_equipment', 0, 'fault-report.pdf', 'urgent', 'IT', true, 'completed',
    '{"category":"it_equipment","department":"IT","priority":"urgent","approvalRequired":true,"reason":"Wording suggests work is blocked, so this is raised as urgent."}'::jsonb,
-   (select id from public.users where email = 'hr@irs.com.my'),
+   (select id from public.profiles where email = 'hr@irs.com.my'),
    now() - interval '20 days', 'Replacement unit issued while the board is repaired.',
    now() - interval '21 days'),
 
-  ((select id from public.users where email = 'chen@irs.com.my'),
+  ((select id from public.profiles where email = 'chen@irs.com.my'),
    'Ergonomic chair replacement',
    'My chair is damaged and the back support no longer holds position.',
    'office_furniture', 65000, null, 'high', 'Admin', true, 'in_progress',
    '{"category":"office_furniture","department":"Admin","priority":"high","approvalRequired":true,"reason":"Replacement of damaged furniture is treated as high priority."}'::jsonb,
-   (select id from public.users where email = 'hr@irs.com.my'),
+   (select id from public.profiles where email = 'hr@irs.com.my'),
    now() - interval '9 days', 'Approved, waiting on the supplier delivery.',
    now() - interval '12 days'),
 
-  ((select id from public.users where email = 'lee@irs.com.my'),
+  ((select id from public.profiles where email = 'lee@irs.com.my'),
    'JetBrains licence for backend work',
    'Please install and license the JetBrains IDE on my workstation.',
    'software', 74000, null, 'normal', 'IT', true, 'pending_approval',
    '{"category":"software","department":"IT","priority":"normal","approvalRequired":true,"reason":"Software licences are purchased centrally and need approval."}'::jsonb,
    null, null, null, now() - interval '4 days'),
 
-  ((select id from public.users where email = 'ks@irs.com.my'),
+  ((select id from public.profiles where email = 'ks@irs.com.my'),
    'Name cards for client visits',
    'I need business cards printed with my new designation for upcoming client visits.',
    'name_card', 12000, null, 'normal', 'Admin', true, 'approved',
    '{"category":"name_card","department":"Admin","priority":"normal","approvalRequired":true,"reason":"Printed stationery is ordered by Admin in batches."}'::jsonb,
-   (select id from public.users where email = 'hr@irs.com.my'),
+   (select id from public.profiles where email = 'hr@irs.com.my'),
    now() - interval '6 days', 'Approved, going out with the next print batch.',
    now() - interval '8 days'),
 
-  ((select id from public.users where email = 'joshua@irs.com.my'),
+  ((select id from public.profiles where email = 'joshua@irs.com.my'),
    'Access card not opening the back door',
    'My access card has stopped working on the rear entrance, I have an access issue every morning.',
    'access_card', 0, null, 'high', 'Admin', false, 'in_progress',
    '{"category":"access_card","department":"Admin","priority":"high","approvalRequired":false,"reason":"Access problems are handled directly by Admin without a purchase approval."}'::jsonb,
    null, null, null, now() - interval '3 days'),
 
-  ((select id from public.users where email = 'chen@irs.com.my'),
+  ((select id from public.profiles where email = 'chen@irs.com.my'),
    'Air conditioning in the support room',
    'The aircond in the support area is not cooling and needs maintenance.',
    'maintenance', 0, null, 'high', 'Facilities', false, 'submitted',
    '{"category":"maintenance","department":"Facilities","priority":"high","approvalRequired":false,"reason":"Building maintenance is raised directly with Facilities."}'::jsonb,
    null, null, null, now() - interval '1 day'),
 
-  ((select id from public.users where email = 'lee@irs.com.my'),
+  ((select id from public.profiles where email = 'lee@irs.com.my'),
    'Standing desk converter',
    'A standing desk converter would be nice to have for the afternoons.',
    'office_furniture', 45000, null, 'low', 'Admin', true, 'rejected',
    '{"category":"office_furniture","department":"Admin","priority":"low","approvalRequired":true,"reason":"Described as nice to have, so raised at low priority."}'::jsonb,
-   (select id from public.users where email = 'hr@irs.com.my'),
+   (select id from public.profiles where email = 'hr@irs.com.my'),
    now() - interval '14 days',
    'Not in this quarter budget. Please raise again in the next cycle.',
    now() - interval '16 days'),
 
-  ((select id from public.users where email = 'ks@irs.com.my'),
+  ((select id from public.profiles where email = 'ks@irs.com.my'),
    'Stationery for the sprint board',
    'Whiteboard markers, sticky notes and index cards for the team planning wall.',
    'office_equipment', 8500, null, 'low', 'Admin', false, 'completed',
    '{"category":"office_equipment","department":"Admin","priority":"low","approvalRequired":false,"reason":"Low value consumables are handled by Admin without approval."}'::jsonb,
    null, null, null, now() - interval '30 days'),
 
-  ((select id from public.users where email = 'ks@irs.com.my'),
+  ((select id from public.profiles where email = 'ks@irs.com.my'),
    'Printer in the meeting room jams constantly',
    'The meeting room printer jams on every second job and needs repair.',
    'it_equipment', 0, null, 'high', 'IT', true, 'pending_approval',
@@ -1959,7 +1981,7 @@ insert into public.requests (
 
 -- A short conversation on the requests still being handled.
 insert into public.request_comments (request_id, author_id, body, created_time)
-select r.id, (select id from public.users where email = 'hr@irs.com.my'),
+select r.id, (select id from public.profiles where email = 'hr@irs.com.my'),
        'Supplier quoted two weeks. I will update once it ships.',
        now() - interval '8 days'
   from public.requests r where r.title = 'Ergonomic chair replacement';
@@ -1971,7 +1993,7 @@ select r.id, r.requester_id,
   from public.requests r where r.title = 'Ergonomic chair replacement';
 
 insert into public.request_comments (request_id, author_id, body, created_time)
-select r.id, (select id from public.users where email = 'hr@irs.com.my'),
+select r.id, (select id from public.profiles where email = 'hr@irs.com.my'),
        'Raised with the building manager, they are attending this week.',
        now() - interval '2 days'
   from public.requests r where r.title = 'Access card not opening the back door';
@@ -1996,13 +2018,13 @@ select
   false,
   coalesce(r.reviewed_at, r.created_time)
 from public.requests r
-join public.users u on u.id = r.requester_id;
+join public.profiles u on u.id = r.requester_id;
 
 
 -- ===========================================================================
 -- Remove auth accounts left over from an earlier roster.
 --
--- The rebuild above dropped public.users and the seed has just recreated
+-- The rebuild above dropped public.profiles and the seed has just recreated
 -- exactly the accounts that belong, so anything still in auth.users without a
 -- profile is from a previous run under a different name or email domain.
 --
@@ -2019,11 +2041,11 @@ delete from auth.identities
 where user_id in (
   select a.id
     from auth.users a
-    left join public.users u on u.auth_user_id = a.id
+    left join public.profiles u on u.auth_user_id = a.id
    where u.id is null
 );
 
 delete from auth.users as a
 where not exists (
-  select 1 from public.users u where u.auth_user_id = a.id
+  select 1 from public.profiles u where u.auth_user_id = a.id
 );

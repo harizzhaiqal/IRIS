@@ -14,9 +14,9 @@ export async function getSessionProfile(): Promise<Profile | null> {
   if (!user) return null;
 
   // Matched on auth_user_id, not id: the session carries the Supabase Auth
-  // uuid, while public.users has its own integer key.
+  // uuid, while public.profiles has its own integer key.
   const { data } = await supabase
-    .from("users")
+    .from("profiles")
     .select("*")
     .eq("auth_user_id", user.id)
     .maybeSingle();

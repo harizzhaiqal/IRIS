@@ -18,7 +18,7 @@ export async function getProfileById(id: number): Promise<Profile | null> {
   const supabase = createClient();
 
   const { data } = await supabase
-    .from("users")
+    .from("profiles")
     .select("*")
     .eq("id", id)
     .maybeSingle();
@@ -33,7 +33,7 @@ export async function getProfileName(id: number | null): Promise<string | null> 
   const supabase = createClient();
 
   const { data } = await supabase
-    .from("users")
+    .from("profiles")
     .select("full_name")
     .eq("id", id)
     .maybeSingle();
@@ -46,7 +46,7 @@ export async function listTeamMembers(hodId: number): Promise<ProfileSummary[]> 
   const supabase = createClient();
 
   const { data } = await supabase
-    .from("users")
+    .from("profiles")
     .select(SUMMARY_COLUMNS)
     .eq("hod_id", hodId)
     .eq("is_active", true)
@@ -60,7 +60,7 @@ export async function listActiveEmployees(): Promise<ProfileSummary[]> {
   const supabase = createClient();
 
   const { data } = await supabase
-    .from("users")
+    .from("profiles")
     .select(SUMMARY_COLUMNS)
     .eq("is_active", true)
     .order("full_name");
