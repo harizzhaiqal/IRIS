@@ -62,9 +62,9 @@ $bundle$;
 -- Identities go first: they hold a foreign key to auth.users. They are matched
 -- through that key rather than provider_id, which stores the user's uuid.
 delete from auth.identities
-where user_id in (select id from auth.users where email like '%@irssoftware.test');
+where user_id in (select id from auth.users where email like '%@irs.com.my');
 
-delete from auth.users where email like '%@irssoftware.test';
+delete from auth.users where email like '%@irs.com.my';
 `;
 
 const body = SOURCES.map(

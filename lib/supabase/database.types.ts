@@ -522,6 +522,10 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
+      is_ceo: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
       is_my_team_member: {
         Args: { employee: number };
         Returns: boolean;
@@ -561,7 +565,7 @@ export type Database = {
         | "other";
       request_priority: "low" | "normal" | "high" | "urgent";
       training_effectiveness: "effective" | "average" | "not_effective";
-      user_role: "staff" | "hod" | "hr_admin";
+      user_role: "staff" | "hod" | "hr_admin" | "ceo";
     };
     CompositeTypes: {
       [_ in never]: never;

@@ -43,6 +43,21 @@ as $$
 $$;
 
 -- True when the given employee reports to the caller.
+-- The CEO reads everything and writes nothing. Kept as its own helper so the
+-- read policies and the write guards below both name the same rule.
+create or replace function public.is_ceo()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.users
+     where auth_user_id = auth.uid() and role = 'ceo'
+  );
+$$;
+
 create or replace function public.is_my_team_member(employee integer)
 returns boolean
 language sql
@@ -72,6 +87,7 @@ as $$
          s.employee_id = public.current_user_id()
          or public.is_my_team_member(s.employee_id)
          or public.is_hr_admin()
+         or public.is_ceo()
        )
   );
 $$;
@@ -90,12 +106,15 @@ as $$
      where s.id = submission
        and s.employee_id = public.current_user_id()
        and s.status in ('draft', 'returned_by_hod', 'rejected')
+       -- The CEO does not file a training record, so nothing is editable.
+       and not public.is_ceo()
   );
 $$;
 
 revoke execute on function public.current_user_id() from public;
 revoke execute on function public.current_user_role() from public;
 revoke execute on function public.is_hr_admin() from public;
+revoke execute on function public.is_ceo() from public;
 revoke execute on function public.is_my_team_member(integer) from public;
 revoke execute on function public.can_view_submission(integer) from public;
 revoke execute on function public.can_edit_submission(integer) from public;
@@ -103,6 +122,7 @@ revoke execute on function public.can_edit_submission(integer) from public;
 grant execute on function public.current_user_id() to authenticated;
 grant execute on function public.current_user_role() to authenticated;
 grant execute on function public.is_hr_admin() to authenticated;
+grant execute on function public.is_ceo() to authenticated;
 grant execute on function public.is_my_team_member(integer) to authenticated;
 grant execute on function public.can_view_submission(integer) to authenticated;
 grant execute on function public.can_edit_submission(integer) to authenticated;
@@ -225,9 +245,18 @@ create policy training_submissions_select_hr on public.training_submissions
   using (public.is_hr_admin());
 
 -- An employee opens their own month, and only as a draft.
+-- The CEO sees the whole company, read only.
+create policy training_submissions_select_ceo on public.training_submissions
+  for select to authenticated
+  using (public.is_ceo());
+
 create policy training_submissions_insert_own on public.training_submissions
   for insert to authenticated
-  with check (employee_id = public.current_user_id() and status = 'draft');
+  with check (
+    employee_id = public.current_user_id()
+    and status = 'draft'
+    and not public.is_ceo()
+  );
 
 -- An employee edits their own month only while it is open to them. Which
 -- columns they may touch is enforced by enforce_submission_update_rules.
@@ -236,6 +265,7 @@ create policy training_submissions_update_own on public.training_submissions
   using (
     employee_id = public.current_user_id()
     and status in ('draft', 'returned_by_hod', 'rejected')
+    and not public.is_ceo()
   )
   with check (employee_id = public.current_user_id());
 
@@ -255,7 +285,11 @@ create policy training_submissions_update_hr on public.training_submissions
 -- An employee may discard a month only while it is still a draft.
 create policy training_submissions_delete_own_draft on public.training_submissions
   for delete to authenticated
-  using (employee_id = public.current_user_id() and status = 'draft');
+  using (
+    employee_id = public.current_user_id()
+    and status = 'draft'
+    and not public.is_ceo()
+  );
 
 -- ---------------------------------------------------------------------------
 -- training_records — visibility follows the parent submission, editing is
@@ -321,7 +355,7 @@ create policy training_attachments_delete_own on public.training_attachments
 
 create policy automation_logs_select_hr_admin on public.automation_logs
   for select to authenticated
-  using (public.is_hr_admin());
+  using (public.is_hr_admin() or public.is_ceo());
 
 -- ---------------------------------------------------------------------------
 -- Workflow enforcement

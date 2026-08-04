@@ -128,7 +128,7 @@ async function applyBundle(label) {
     counts[table] = rows[0].n;
   }
   const { rows: users } = await db.query(
-    `select count(*)::int as n from auth.users where email like '%@irssoftware.test'`,
+    `select count(*)::int as n from auth.users where email like '%@irs.com.my'`,
   );
   counts.auth_users = users[0].n;
   return counts;
@@ -136,11 +136,11 @@ async function applyBundle(label) {
 
 const first = await applyBundle("First run (fresh database)");
 
-check("11 users seeded", first.users === 11, `got ${first.users}`);
-check("3 departments seeded", first.departments === 3, `got ${first.departments}`);
+check("8 users seeded", first.users === 8, `got ${first.users}`);
+check("7 departments seeded", first.departments === 7, `got ${first.departments}`);
 check("submissions seeded", first.training_submissions > 50, `got ${first.training_submissions}`);
 check("training entries seeded", first.training_records > 100, `got ${first.training_records}`);
-check("11 auth accounts created", first.auth_users === 11, `got ${first.auth_users}`);
+check("8 auth accounts created", first.auth_users === 8, `got ${first.auth_users}`);
 check("10 demo requests seeded", first.requests === 10, `got ${first.requests}`);
 check("request comments seeded", first.request_comments >= 3, `got ${first.request_comments}`);
 
@@ -155,7 +155,7 @@ check(
 // A duplicated auth account would break sign-in, so verify emails stay unique.
 const { rows: dupes } = await db.query(`
   select email, count(*)::int as n from auth.users
-  where email like '%@irssoftware.test' group by email having count(*) > 1
+  where email like '%@irs.com.my' group by email having count(*) > 1
 `);
 check("no duplicate demo accounts after re-run", dupes.length === 0, JSON.stringify(dupes));
 
@@ -192,7 +192,7 @@ const { rows: links } = await db.query(`
   select count(*)::int as n from public.users u
    join auth.users a on a.id = u.auth_user_id
 `);
-check("every profile links to an auth account", links[0].n === 11, `got ${links[0].n}`);
+check("every profile links to an auth account", links[0].n === 8, `got ${links[0].n}`);
 
 // Recreating the public schema discards Supabase's default privileges for it,
 // so the migration must grant table access itself. Without this the app builds,

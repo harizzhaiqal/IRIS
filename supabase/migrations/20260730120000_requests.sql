@@ -140,6 +140,7 @@ as $$
        and (
          r.requester_id = public.current_user_id()
          or public.is_hr_admin()
+         or public.is_ceo()
          or public.is_my_team_member(r.requester_id)
        )
   );
@@ -176,6 +177,13 @@ create policy requests_select_hr on public.requests
 
 -- Staff raise their own requests, and only in an opening state. Approving your
 -- own request by choosing the status on insert is what this forbids.
+-- The CEO sees every request, read only.
+drop policy if exists requests_select_ceo on public.requests;
+
+create policy requests_select_ceo on public.requests
+  for select to authenticated
+  using (public.is_ceo());
+
 drop policy if exists requests_insert_own on public.requests;
 
 create policy requests_insert_own on public.requests
@@ -183,6 +191,7 @@ create policy requests_insert_own on public.requests
   with check (
     requester_id = public.current_user_id()
     and status in ('submitted', 'pending_approval')
+    and not public.is_ceo()
   );
 
 -- The requester may still correct a request nobody has picked up yet. Which
@@ -194,6 +203,7 @@ create policy requests_update_own on public.requests
   using (
     requester_id = public.current_user_id()
     and status in ('submitted', 'pending_approval')
+    and not public.is_ceo()
   )
   with check (requester_id = public.current_user_id());
 
@@ -203,8 +213,14 @@ drop policy if exists requests_update_reviewer on public.requests;
 
 create policy requests_update_reviewer on public.requests
   for update to authenticated
-  using (public.is_hr_admin() or public.is_my_team_member(requester_id))
-  with check (public.is_hr_admin() or public.is_my_team_member(requester_id));
+  using (
+    (public.is_hr_admin() or public.is_my_team_member(requester_id))
+    and not public.is_ceo()
+  )
+  with check (
+    (public.is_hr_admin() or public.is_my_team_member(requester_id))
+    and not public.is_ceo()
+  );
 
 -- Comments follow the request: if you can see it, you can read and add them.
 drop policy if exists request_comments_select on public.request_comments;
@@ -220,6 +236,7 @@ create policy request_comments_insert on public.request_comments
   with check (
     author_id = public.current_user_id()
     and public.can_view_request(request_id)
+    and not public.is_ceo()
   );
 
 -- ---------------------------------------------------------------------------

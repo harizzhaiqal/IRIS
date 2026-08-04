@@ -49,7 +49,7 @@ export default async function SubmissionsPage({
     employee?: string;
   };
 }) {
-  await requireRole(["hr_admin"]);
+  await requireRole(["hr_admin", "ceo"]);
   const now = new Date();
 
   const monthParam = Number(searchParams.month);

@@ -145,3 +145,17 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **`lib/actionResult.ts` was extracted for the shared `ActionResult` type.** Training still declares its own copy. Migrating it is a change to the finished module and is deliberately not bundled with new work.
 
 **The requests migration is re-runnable.** It is the one migration pasted into the SQL Editor by hand — the whole point of it being additive is that it can be applied to a database already holding training data — so a second paste has to be a no-op rather than `type "request_status" already exists` a third of the way down. Tables and indexes use `if not exists`, policies and triggers are dropped before they are created, and the enums are guarded in a `DO` block because Postgres offers no `CREATE TYPE IF NOT EXISTS`. `verify-sql.mjs` applies the file twice on every run, so this cannot regress.
+
+## The CEO role
+
+**`ceo` is declared in the `user_role` enum from creation, not added later by `ALTER TYPE`.** Postgres refuses to use a newly added enum value in the transaction that added it — `unsafe use of new value` — and `setup.sql` is a single paste, so an `ALTER TYPE` followed by a seed that inserts a CEO would fail partway down. Since `setup.sql` rebuilds the schema anyway, declaring it up front removes the hazard entirely rather than working around it.
+
+**Read-only is enforced by the database, not by hiding buttons.** Every write policy that could otherwise match — opening a training month, editing an entry, raising a request, deciding one, commenting — carries `and not public.is_ceo()`. The UI gates on the same rule so the CEO never sees a control that would fail, and `/requests/new` redirects rather than rendering a form the database would reject. `verify-sql.mjs` asserts the CEO reads every table and that each write changes zero rows.
+
+**The CEO has no department and no reporting line.** They file no monthly record, so there is nothing for a HOD to verify, and they verify nobody, so no one reports to them for this purpose. The four HODs are paired with each other instead — Chng Kok Sheng with Joshua, Ms. Chen with Ms. Lee — because a HOD's own record still needs a HOD stage and the CEO cannot provide one.
+
+**The CEO reuses the HR dashboard.** It is company-wide compliance figures with one link, and nothing on it acts. Building a separate CEO view would have duplicated it to no purpose.
+
+**Two staff placeholders were added to a roster that named only heads of department.** Staff are who the training module is for; without one there is nobody to demonstrate the main flow as, and no subject for the checks that an employee cannot read a colleague's records. They are named `Demo Staff (R&D)` and `Demo Staff (Support)` so they read as placeholders rather than as invented colleagues.
+
+**The tests no longer depend on which month the seed leaves in draft for one person.** Changing the roster broke several checks that had reached for a specific seeded row. Those blocks now open their own submission first, so a future roster change cannot break them again.

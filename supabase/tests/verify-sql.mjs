@@ -203,20 +203,24 @@ console.log("  applied without error");
 // integer, so those ids are read back rather than written down here.
 const AUTH_UID = {
   hr: "11111111-1111-1111-1111-111111111111",
-  faizal: "22222222-2222-2222-2222-222222222222",
-  sharon: "33333333-3333-3333-3333-333333333333",
-  aiman: "44444444-4444-4444-4444-444444444444",
-  preetha: "55555555-5555-5555-5555-555555555555",
-  nadia: "88888888-8888-8888-8888-888888888888",
+  ks: "22222222-2222-2222-2222-222222222222",
+  joshua: "33333333-3333-3333-3333-333333333333",
+  chen: "44444444-4444-4444-4444-444444444444",
+  lee: "55555555-5555-5555-5555-555555555555",
+  ceo: "66666666-6666-6666-6666-666666666666",
+  staffRnd: "77777777-7777-7777-7777-777777777777",
+  staffSupport: "88888888-8888-8888-8888-888888888888",
 };
 
 const EMAIL = {
-  hr: "hr@irssoftware.test",
-  faizal: "faizal@irssoftware.test",
-  sharon: "sharon@irssoftware.test",
-  aiman: "aiman@irssoftware.test",
-  preetha: "preetha@irssoftware.test",
-  nadia: "nadia@irssoftware.test",
+  hr: "hr@irs.com.my",
+  ks: "ks@irs.com.my",
+  joshua: "joshua@irs.com.my",
+  chen: "chen@irs.com.my",
+  lee: "lee@irs.com.my",
+  ceo: "polak@irs.com.my",
+  staffRnd: "staff.rnd@irs.com.my",
+  staffSupport: "staff.support@irs.com.my",
 };
 
 const uid = {};
@@ -289,11 +293,12 @@ console.log("\n=== Seed shape ===");
     `select role, count(*)::int as n from public.users group by role order by role`,
   );
   const byRole = Object.fromEntries(roles.rows.map((r) => [r.role, r.n]));
-  check("1 hr_admin, 2 hods, 8 staff", byRole.hr_admin === 1 && byRole.hod === 2 && byRole.staff === 8,
+  check("1 hr_admin, 4 hods, 2 staff, 1 ceo",
+    byRole.hr_admin === 1 && byRole.hod === 4 && byRole.staff === 2 && byRole.ceo === 1,
     JSON.stringify(byRole));
 
   const depts = await db.query(`select count(*)::int as n from public.departments`);
-  check("3 departments", depts.rows[0].n === 3, `got ${depts.rows[0].n}`);
+  check("7 departments", depts.rows[0].n === 7, `got ${depts.rows[0].n}`);
 
   const statuses = await db.query(
     `select status, count(*)::int as n from public.training_submissions group by status order by status`,
@@ -312,7 +317,7 @@ console.log("\n=== Seed shape ===");
   check("nil returns present", nil.rows[0].n > 0, `got ${nil.rows[0].n}`);
 
   const users = await db.query(`select count(*)::int as n from auth.users`);
-  check("auth accounts created", users.rows[0].n === 11, `got ${users.rows[0].n}`);
+  check("auth accounts created", users.rows[0].n === 8, `got ${users.rows[0].n}`);
 
   const spread = await db.query(`
     select min(total)::int as lo, max(total)::int as hi from (
@@ -432,37 +437,37 @@ console.log("\n=== total_minutes cannot be forged ===");
 
 console.log("\n=== RLS: row visibility ===");
 {
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     const own = await db.query(
       `select count(*)::int as n from public.training_submissions where employee_id = $1`,
-      [uid.aiman]);
+      [uid.staffRnd]);
     check("staff sees their own submissions", own.rows[0].n > 0, `got ${own.rows[0].n}`);
 
     const others = await db.query(
       `select count(*)::int as n from public.training_submissions where employee_id = $1`,
-      [uid.preetha]);
+      [uid.staffSupport]);
     check("staff sees nothing of a colleague's submissions", others.rows[0].n === 0,
       `got ${others.rows[0].n}`);
 
     const otherRecords = await db.query(`
       select count(*)::int as n from public.training_records r
        join public.training_submissions s on s.id = r.submission_id
-       where s.employee_id = $1`, [uid.preetha]);
+       where s.employee_id = $1`, [uid.staffSupport]);
     check("staff sees none of a colleague's training records", otherRecords.rows[0].n === 0);
 
     const logs = await db.query(`select count(*)::int as n from public.automation_logs`);
     check("staff cannot read the audit trail", logs.rows[0].n === 0, `got ${logs.rows[0].n}`);
   });
 
-  await asUser(AUTH_UID.faizal, async () => {
+  await asUser(AUTH_UID.ks, async () => {
     const team = await db.query(
       `select count(*)::int as n from public.training_submissions where employee_id = $1`,
-      [uid.aiman]);
+      [uid.staffRnd]);
     check("hod sees a team member's submissions", team.rows[0].n > 0);
 
     const outside = await db.query(
       `select count(*)::int as n from public.training_submissions where employee_id = $1`,
-      [uid.nadia]);
+      [uid.staffSupport]);
     check("hod sees nothing outside their team", outside.rows[0].n === 0,
       `got ${outside.rows[0].n}`);
   });
@@ -470,7 +475,8 @@ console.log("\n=== RLS: row visibility ===");
   await asUser(AUTH_UID.hr, async () => {
     const all = await db.query(
       `select count(distinct employee_id)::int as n from public.training_submissions`);
-    check("hr sees every employee", all.rows[0].n === 11, `got ${all.rows[0].n}`);
+    check("hr sees every employee who files a record", all.rows[0].n === 7,
+      `got ${all.rows[0].n}`);
 
     const logs = await db.query(`select count(*)::int as n from public.automation_logs`);
     check("hr can read the audit trail", logs.rows[0].n > 0);
@@ -479,35 +485,42 @@ console.log("\n=== RLS: row visibility ===");
 
 console.log("\n=== RLS: editing windows ===");
 {
-  const draft = await db.query(`
+  const locked = await db.query(`
     select id from public.training_submissions
-     where employee_id = $1 and status = 'draft' limit 1`, [uid.aiman]);
-  const approved = await db.query(`
-    select id from public.training_submissions
-     where employee_id = $1 and status = 'approved' limit 1`, [uid.aiman]);
+     where employee_id = $1
+       and status not in ('draft', 'returned_by_hod', 'rejected')
+     limit 1`, [uid.staffRnd]);
 
-  await asUser(AUTH_UID.aiman, async () => {
-    if (draft.rows[0]) {
-      const res = await db.query(
-        `insert into public.training_records
-           (submission_id, seq_no, title, start_datetime, end_datetime, calculated_minutes, recorded_minutes)
-         values ($1, 50, 'Allowed while draft', '2026-07-06 09:00+00', '2026-07-06 12:00+00', 180, 180)
-         returning id`, [draft.rows[0].id]);
-      check("staff may add entries to a draft month", res.rows.length === 1);
+  await asUser(AUTH_UID.staffRnd, async () => {
+    // Opened here rather than looked up: which month the seed happens to leave
+    // in draft for one person is not what these checks are about, and tying
+    // them to it makes them break every time the roster changes.
+    const opened = await db.query(
+      `insert into public.training_submissions (employee_id, month, year, status)
+       values ($1, 5, 2028, 'draft') returning id`, [uid.staffRnd]);
+    const draftId = opened.rows[0].id;
+
+    const res = await db.query(
+      `insert into public.training_records
+         (submission_id, seq_no, title, start_datetime, end_datetime, calculated_minutes, recorded_minutes)
+       values ($1, 50, 'Allowed while draft', '2028-05-06 09:00+00', '2028-05-06 12:00+00', 180, 180)
+       returning id`, [draftId]);
+    check("staff may add entries to a draft month", res.rows.length === 1);
+
+    if (locked.rows[0]) {
+      await expectError("staff may not add entries to a submitted month", () =>
+        db.query(
+          `insert into public.training_records
+             (submission_id, seq_no, title, start_datetime, end_datetime, calculated_minutes, recorded_minutes)
+           values ($1, 51, 'Blocked', '2026-01-06 09:00+00', '2026-01-06 12:00+00', 180, 180)`,
+          [locked.rows[0].id]),
+        "row-level security");
     }
-
-    await expectError("staff may not add entries to an approved month", () =>
-      db.query(
-        `insert into public.training_records
-           (submission_id, seq_no, title, start_datetime, end_datetime, calculated_minutes, recorded_minutes)
-         values ($1, 51, 'Blocked', '2026-01-06 09:00+00', '2026-01-06 12:00+00', 180, 180)`,
-        [approved.rows[0].id]),
-      "row-level security");
 
     await expectError("staff cannot approve their own month", () =>
       db.query(
         `update public.training_submissions set status = 'approved' where id = $1`,
-        [draft.rows[0].id]),
+        [draftId]),
       "only move a submission to submitted_pending_hod");
   });
 }
@@ -516,11 +529,11 @@ console.log("\n=== Two-stage verification ===");
 {
   const res = await db.query(`
     select id from public.training_submissions
-     where employee_id = $1 and status = 'draft' limit 1`, [uid.aiman]);
+     where employee_id = $1 and status = 'draft' limit 1`, [uid.staffRnd]);
   const subId = res.rows[0].id;
 
   // Staff submits.
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     await db.query(
       `update public.training_submissions
           set status = 'submitted_pending_hod', submitted_at = now() where id = $1`, [subId]);
@@ -537,7 +550,7 @@ console.log("\n=== Two-stage verification ===");
 
   // A HOD outside the team cannot act. RLS filters the row out rather than
   // raising, so the update must simply touch nothing.
-  await asUser(AUTH_UID.sharon, async () => {
+  await asUser(AUTH_UID.joshua, async () => {
     const res = await db.query(
       `update public.training_submissions set status = 'hod_verified'
         where id = $1 returning id`, [subId]);
@@ -549,7 +562,7 @@ console.log("\n=== Two-stage verification ===");
     row.rows[0].status === "submitted_pending_hod", row.rows[0].status);
 
   // Return requires a comment.
-  await asUser(AUTH_UID.faizal, async () => {
+  await asUser(AUTH_UID.ks, async () => {
     await expectError("returning without a comment is refused", () =>
       db.query(`update public.training_submissions set status = 'returned_by_hod' where id = $1`, [subId]),
       "requires a comment");
@@ -570,11 +583,11 @@ console.log("\n=== Two-stage verification ===");
     [subId]);
   check("hod return recorded with actor and timestamp",
     row.rows[0].status === "returned_by_hod" &&
-    row.rows[0].hod_verified_by === uid.faizal &&
+    row.rows[0].hod_verified_by === uid.ks &&
     row.rows[0].hod_verified_at !== null);
 
   // Staff revises and resubmits.
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     await db.query(
       `update public.training_submissions set status = 'submitted_pending_hod' where id = $1`, [subId]);
   });
@@ -583,7 +596,7 @@ console.log("\n=== Two-stage verification ===");
     row.rows[0].status === "submitted_pending_hod");
 
   // HOD verifies.
-  await asUser(AUTH_UID.faizal, async () => {
+  await asUser(AUTH_UID.ks, async () => {
     await db.query(
       `update public.training_submissions
           set status = 'hod_verified', hod_comment = null where id = $1`, [subId]);
@@ -653,13 +666,13 @@ console.log("\n=== Nil returns ===");
 
 console.log("\n=== Privilege escalation ===");
 {
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     await expectError("staff cannot promote themselves", () =>
-      db.query(`update public.users set role = 'hr_admin' where id = $1`, [uid.aiman]),
+      db.query(`update public.users set role = 'hr_admin' where id = $1`, [uid.staffRnd]),
       "only hr can change role");
 
     await expectError("staff cannot reassign their reporting line", () =>
-      db.query(`update public.users set hod_id = null where id = $1`, [uid.aiman]),
+      db.query(`update public.users set hod_id = null where id = $1`, [uid.staffRnd]),
       "only hr can change role");
 
     // Rebinding the credential link would hand this account to someone else,
@@ -667,12 +680,12 @@ console.log("\n=== Privilege escalation ===");
     await expectError("staff cannot repoint their profile at another account", () =>
       db.query(
         `update public.users set auth_user_id = $2 where id = $1`,
-        [uid.aiman, AUTH_UID.preetha]),
+        [uid.staffRnd, AUTH_UID.staffSupport]),
       "cannot be reassigned");
 
     const res = await db.query(
       `update public.users set designation = 'Principal Engineer' where id = $1 returning designation`,
-      [uid.aiman]);
+      [uid.staffRnd]);
     check("staff may still edit their own designation", res.rows[0]?.designation === "Principal Engineer");
   });
 }
@@ -682,11 +695,11 @@ console.log("\n=== Privilege escalation ===");
 // that reported "Could not open this month for editing".
 console.log("\n=== Add training, start to finish ===");
 {
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     const opened = await db.query(
       `insert into public.training_submissions (employee_id, month, year, status)
        values ($1, 3, 2027, 'draft') returning id`,
-      [uid.aiman],
+      [uid.staffRnd],
     );
     check("staff can open a month that does not exist yet", opened.rows.length === 1);
 
@@ -696,7 +709,7 @@ console.log("\n=== Add training, start to finish ===");
     // cannot tell an existing month from a missing one.
     const readBack = await db.query(
       `select id from public.training_submissions where employee_id = $1 and month = 3 and year = 2027`,
-      [uid.aiman],
+      [uid.staffRnd],
     );
     check("the month just opened is visible to its owner", readBack.rows.length === 1);
 
@@ -729,11 +742,11 @@ console.log("\n=== Records survive a new session ===");
   let submissionId;
   let recordId;
 
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     const opened = await db.query(
       `insert into public.training_submissions (employee_id, month, year, status)
        values ($1, 9, 2027, 'draft') returning id`,
-      [uid.aiman],
+      [uid.staffRnd],
     );
     submissionId = opened.rows[0].id;
 
@@ -757,7 +770,7 @@ console.log("\n=== Records survive a new session ===");
   });
 
   // asUser resets the impersonation on exit, so this block is a fresh session.
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     const sub = await db.query(
       `select status, total_minutes from public.training_submissions where id = $1`,
       [submissionId],
@@ -775,7 +788,7 @@ console.log("\n=== Records survive a new session ===");
   });
 
   // A submitted month is no longer editable, but it must remain visible.
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     const listed = await db.query(
       `select count(*)::int as n from public.training_records
         where submission_id = $1`, [submissionId]);
@@ -812,10 +825,10 @@ console.log("\n=== Requests: seed shape ===");
 
 console.log("\n=== Requests: visibility ===");
 {
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     const mine = await db.query(
       `select count(*)::int as n from public.requests where requester_id <> $1`,
-      [uid.aiman]);
+      [uid.staffRnd]);
     check("staff see no one else's requests", mine.rows[0].n === 0, `${mine.rows[0].n} leaked`);
   });
 
@@ -824,13 +837,13 @@ console.log("\n=== Requests: visibility ===");
     check("hr sees every request", all.rows[0].n === 10, `${all.rows[0].n}`);
   });
 
-  await asUser(AUTH_UID.faizal, async () => {
+  await asUser(AUTH_UID.ks, async () => {
     // Faizal heads Software Development, so he sees his team's and his own.
     const team = await db.query(`
       select count(*)::int as n from public.requests r
       join public.users u on u.id = r.requester_id
       where u.hod_id is distinct from $1 and r.requester_id <> $2`,
-      [uid.faizal, uid.faizal]);
+      [uid.ks, uid.ks]);
     check("a hod sees only their team's requests and their own",
       team.rows[0].n === 0, `${team.rows[0].n} outside the team`);
   });
@@ -840,11 +853,15 @@ console.log("\n=== Requests: who may decide ===");
 {
   // Faizal raised a request of his own; he must not be able to approve it even
   // though he holds a reviewing role.
+  // Must be one still open: a request already decided is out of everyone's
+  // reach by policy, so the attempt would touch no rows and prove nothing.
   const own = await db.query(
-    `select id from public.requests where requester_id = $1 limit 1`, [uid.faizal]);
+    `select id from public.requests
+      where requester_id = $1 and status in ('submitted', 'pending_approval')
+      limit 1`, [uid.ks]);
   const ownId = own.rows[0].id;
 
-  await asUser(AUTH_UID.faizal, async () => {
+  await asUser(AUTH_UID.ks, async () => {
     await expectError("a reviewer cannot approve their own request", () =>
       db.query(`update public.requests set status = 'approved' where id = $1`, [ownId]),
       "cannot be approved or rejected by the person who raised it");
@@ -853,7 +870,7 @@ console.log("\n=== Requests: who may decide ===");
   const others = await db.query(
     `select id from public.requests where status = 'pending_approval' limit 1`);
 
-  await asUser(AUTH_UID.aiman, async () => {
+  await asUser(AUTH_UID.staffRnd, async () => {
     // Two separate defences, and both are worth pinning down.
     //
     // First the policy: once a request has been decided, the USING clause stops
@@ -861,7 +878,7 @@ console.log("\n=== Requests: who may decide ===");
     const settled = await db.query(
       `update public.requests set title = 'Reopened by the requester'
         where requester_id = $1 and status = 'approved' returning id`,
-      [uid.aiman]);
+      [uid.staffRnd]);
     check("a decided request is out of its owner's reach",
       settled.rows.length === 0, `${settled.rows.length} rows changed`);
 
@@ -871,7 +888,7 @@ console.log("\n=== Requests: who may decide ===");
       `insert into public.requests (requester_id, title, description, category, status)
        values ($1, 'Spare keyboard', 'The space bar sticks.', 'it_equipment', 'submitted')
        returning id`,
-      [uid.aiman]);
+      [uid.staffRnd]);
 
     await expectError("a requester cannot move their own request past approval", () =>
       db.query(`update public.requests set status = 'completed' where id = $1`,
@@ -925,6 +942,120 @@ console.log("\n=== Requests: rejection needs a reason ===");
   } else {
     check("a pending request exists to reject", false, "none left in the seed");
   }
+}
+
+// ---------------------------------------------------------------------------
+// The CEO reads the whole company and writes none of it. Hiding the buttons is
+// not the guarantee — these checks go straight at the tables.
+// ---------------------------------------------------------------------------
+
+console.log("\n=== CEO: reads everything ===");
+{
+  // Counted as the table owner first: earlier blocks add rows, so a hardcoded
+  // total would drift. What matters is that the CEO sees all of whatever exists.
+  const { rows: totals } = await db.query(
+    `select count(*)::int as n from public.requests`);
+  const trueRequestCount = totals[0].n;
+
+  await asUser(AUTH_UID.ceo, async () => {
+    const people = await db.query(`select count(*)::int as n from public.users`);
+    check("ceo sees the whole staff directory", people.rows[0].n === 8, `${people.rows[0].n}`);
+
+    const subs = await db.query(
+      `select count(distinct employee_id)::int as n from public.training_submissions`);
+    check("ceo sees every employee's training", subs.rows[0].n === 7, `${subs.rows[0].n}`);
+
+    const records = await db.query(`select count(*)::int as n from public.training_records`);
+    check("ceo sees the training entries behind them", records.rows[0].n > 0);
+
+    const reqs = await db.query(`select count(*)::int as n from public.requests`);
+    check("ceo sees every request", reqs.rows[0].n === trueRequestCount,
+      `${reqs.rows[0].n} of ${trueRequestCount}`);
+
+    const comments = await db.query(`select count(*)::int as n from public.request_comments`);
+    check("ceo sees request comments", comments.rows[0].n >= 3);
+
+    const logs = await db.query(`select count(*)::int as n from public.automation_logs`);
+    check("ceo can read the audit trail for reporting", logs.rows[0].n > 0);
+  });
+}
+
+console.log("\n=== CEO: writes nothing ===");
+{
+  const anyOpenRequest = await db.query(
+    `select id from public.requests
+      where status in ('submitted', 'pending_approval') limit 1`);
+  const anyPendingSubmission = await db.query(
+    `select id from public.training_submissions
+      where status = 'submitted_pending_hod' limit 1`);
+  const anyRecord = await db.query(`select id from public.training_records limit 1`);
+
+  await asUser(AUTH_UID.ceo, async () => {
+    // Every one of these is silently filtered by policy rather than raising, so
+    // each is asserted on rows affected. A write that changes nothing is the
+    // outcome; a write that changes something is the bug.
+    const opened = await db.query(
+      `insert into public.training_submissions (employee_id, month, year, status)
+       values ($1, 4, 2028, 'draft')
+       on conflict do nothing returning id`,
+      [uid.ceo]).catch(() => ({ rows: [] }));
+    check("ceo cannot open a training month", opened.rows.length === 0,
+      `${opened.rows.length} rows`);
+
+    if (anyRecord.rows[0]) {
+      const edited = await db.query(
+        `update public.training_records set title = 'Rewritten by the CEO'
+          where id = $1 returning id`, [anyRecord.rows[0].id]).catch(() => ({ rows: [] }));
+      check("ceo cannot edit a training entry", edited.rows.length === 0,
+        `${edited.rows.length} rows`);
+    }
+
+    if (anyPendingSubmission.rows[0]) {
+      const verified = await db.query(
+        `update public.training_submissions set status = 'hod_verified'
+          where id = $1 returning id`,
+        [anyPendingSubmission.rows[0].id]).catch(() => ({ rows: [] }));
+      check("ceo cannot verify a submission", verified.rows.length === 0,
+        `${verified.rows.length} rows`);
+    }
+
+    const raised = await db.query(
+      `insert into public.requests (requester_id, title, description, category, status)
+       values ($1, 'CEO raised this', 'Should not be possible.', 'other', 'submitted')
+       returning id`, [uid.ceo]).catch(() => ({ rows: [] }));
+    check("ceo cannot raise a request", raised.rows.length === 0, `${raised.rows.length} rows`);
+
+    if (anyOpenRequest.rows[0]) {
+      const decided = await db.query(
+        `update public.requests set status = 'approved' where id = $1 returning id`,
+        [anyOpenRequest.rows[0].id]).catch(() => ({ rows: [] }));
+      check("ceo cannot approve a request", decided.rows.length === 0,
+        `${decided.rows.length} rows`);
+
+      const commented = await db.query(
+        `insert into public.request_comments (request_id, author_id, body)
+         values ($1, $2, 'CEO comment') returning id`,
+        [anyOpenRequest.rows[0].id, uid.ceo]).catch(() => ({ rows: [] }));
+      check("ceo cannot comment on a request", commented.rows.length === 0,
+        `${commented.rows.length} rows`);
+    }
+  });
+
+  // Nothing above may have left a mark.
+  const ceoSubs = await db.query(
+    `select count(*)::int as n from public.training_submissions where employee_id = $1`,
+    [uid.ceo]);
+  check("the ceo owns no training submissions at all", ceoSubs.rows[0].n === 0,
+    `${ceoSubs.rows[0].n}`);
+
+  const ceoReqs = await db.query(
+    `select count(*)::int as n from public.requests where requester_id = $1`, [uid.ceo]);
+  check("the ceo owns no requests at all", ceoReqs.rows[0].n === 0, `${ceoReqs.rows[0].n}`);
+
+  const rewritten = await db.query(
+    `select count(*)::int as n from public.training_records
+      where title = 'Rewritten by the CEO'`);
+  check("no training entry was rewritten", rewritten.rows[0].n === 0);
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

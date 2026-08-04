@@ -15,17 +15,29 @@ import { cn } from "@/lib/utils";
  *    on the tinted login panel, and over the honeycomb, so a filled disc would
  *    show as a visible blob on two of the three.
  * 2. The blade group is isolated. `mix-blend-mode` otherwise blends with
- *    whatever is behind the logo — including the honeycomb — instead of only
- *    with the other blades. Isolated, a transparent backdrop leaves the first
- *    blade untouched and the overlaps still darken, which is the whole effect.
+ *    whatever is behind the logo instead of only with the other blades.
  */
 
 const BLADES = [0, 60, 120, 180, 240, 300];
 
-/** The sheet's "on light" pairing. The app has no dark surfaces behind the
- *  logo, so the screen-blended dark variant is not carried over. */
-const BLADE_GRADIENT =
-  "linear-gradient(135deg, oklch(0.6 0.19 290), oklch(0.65 0.16 195))";
+/** Both pairings come from the sheet: it lightens on dark surfaces and darkens
+ *  on light ones, so the overlaps stay visible either way. */
+const TONES = {
+  light: {
+    gradient:
+      "linear-gradient(135deg, oklch(0.6 0.19 290), oklch(0.65 0.16 195))",
+    blend: "multiply" as const,
+    ring: "oklch(0.3 0.02 260 / 0.4)",
+    word: "oklch(0.3 0.02 260)",
+  },
+  dark: {
+    gradient:
+      "linear-gradient(135deg, oklch(0.72 0.19 290), oklch(0.78 0.16 195))",
+    blend: "screen" as const,
+    ring: "oklch(0.8 0.05 260 / 0.4)",
+    word: "oklch(0.97 0.005 260)",
+  },
+} as const;
 
 const HOLE =
   "radial-gradient(circle at 50% 50%, transparent 0 13%, #000 13.4%)";
@@ -33,19 +45,27 @@ const HOLE =
 const SIZES = {
   /** Login screen. The sheet's primary lockup, scaled to a 384px column. */
   lg: { mark: 80, text: 60, gap: 24, tracking: "-0.03em", ring: true },
+  /** Brand panel on the split layouts. */
+  md: { mark: 48, text: 34, gap: 16, tracking: "-0.03em", ring: true },
   /** The sheet's own "Website header" spec, used as-is. */
   sm: { mark: 32, text: 22, gap: 14, tracking: "-0.02em", ring: false },
 } as const;
 
+export type IrisTone = keyof typeof TONES;
+
 export function IrisMark({
   size = 80,
   ring = true,
+  tone = "light",
   className,
 }: {
   size?: number;
   ring?: boolean;
+  tone?: IrisTone;
   className?: string;
 }) {
+  const t = TONES[tone];
+
   return (
     <span
       className={cn("relative inline-block shrink-0", className)}
@@ -65,8 +85,8 @@ export function IrisMark({
               width: "56%",
               height: "56%",
               borderRadius: "50%",
-              background: BLADE_GRADIENT,
-              mixBlendMode: "multiply",
+              background: t.gradient,
+              mixBlendMode: t.blend,
               transform: `translate(-50%,-50%) rotate(${angle}deg) translateX(38%)`,
             }}
           />
@@ -84,7 +104,7 @@ export function IrisMark({
             width: "26%",
             height: "26%",
             borderRadius: "50%",
-            border: "2px solid oklch(0.3 0.02 260 / 0.4)",
+            border: `2px solid ${t.ring}`,
             transform: "translate(-50%,-50%)",
           }}
         />
@@ -95,9 +115,11 @@ export function IrisMark({
 
 export function IrisLogo({
   size = "lg",
+  tone = "light",
   className,
 }: {
   size?: keyof typeof SIZES;
+  tone?: IrisTone;
   className?: string;
 }) {
   const { mark, text, gap, tracking, ring } = SIZES[size];
@@ -108,7 +130,7 @@ export function IrisLogo({
       className={cn("inline-flex items-center", className)}
       style={{ gap }}
     >
-      <IrisMark size={mark} ring={ring} />
+      <IrisMark size={mark} ring={ring} tone={tone} />
       <span
         aria-hidden
         style={{
@@ -117,7 +139,7 @@ export function IrisLogo({
           fontWeight: 700,
           letterSpacing: tracking,
           lineHeight: 1,
-          color: "oklch(0.3 0.02 260)",
+          color: TONES[tone].word,
         }}
       >
         IRIS

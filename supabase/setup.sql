@@ -46,9 +46,9 @@ $bundle$;
 -- Identities go first: they hold a foreign key to auth.users. They are matched
 -- through that key rather than provider_id, which stores the user's uuid.
 delete from auth.identities
-where user_id in (select id from auth.users where email like '%@irssoftware.test');
+where user_id in (select id from auth.users where email like '%@irs.com.my');
 
-delete from auth.users where email like '%@irssoftware.test';
+delete from auth.users where email like '%@irs.com.my';
 
 
 -- ===========================================================================
@@ -68,7 +68,10 @@ delete from auth.users where email like '%@irssoftware.test';
 -- Enums
 -- ---------------------------------------------------------------------------
 
-create type public.user_role as enum ('staff', 'hod', 'hr_admin');
+-- ceo is declared here rather than added later by ALTER TYPE: Postgres refuses
+-- to use a newly added enum value in the same transaction that added it, which
+-- would break setup.sql, since that file is a single paste.
+create type public.user_role as enum ('staff', 'hod', 'hr_admin', 'ceo');
 
 create type public.submission_status as enum (
   'draft',
@@ -382,6 +385,21 @@ as $$
 $$;
 
 -- True when the given employee reports to the caller.
+-- The CEO reads everything and writes nothing. Kept as its own helper so the
+-- read policies and the write guards below both name the same rule.
+create or replace function public.is_ceo()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.users
+     where auth_user_id = auth.uid() and role = 'ceo'
+  );
+$$;
+
 create or replace function public.is_my_team_member(employee integer)
 returns boolean
 language sql
@@ -411,6 +429,7 @@ as $$
          s.employee_id = public.current_user_id()
          or public.is_my_team_member(s.employee_id)
          or public.is_hr_admin()
+         or public.is_ceo()
        )
   );
 $$;
@@ -429,12 +448,15 @@ as $$
      where s.id = submission
        and s.employee_id = public.current_user_id()
        and s.status in ('draft', 'returned_by_hod', 'rejected')
+       -- The CEO does not file a training record, so nothing is editable.
+       and not public.is_ceo()
   );
 $$;
 
 revoke execute on function public.current_user_id() from public;
 revoke execute on function public.current_user_role() from public;
 revoke execute on function public.is_hr_admin() from public;
+revoke execute on function public.is_ceo() from public;
 revoke execute on function public.is_my_team_member(integer) from public;
 revoke execute on function public.can_view_submission(integer) from public;
 revoke execute on function public.can_edit_submission(integer) from public;
@@ -442,6 +464,7 @@ revoke execute on function public.can_edit_submission(integer) from public;
 grant execute on function public.current_user_id() to authenticated;
 grant execute on function public.current_user_role() to authenticated;
 grant execute on function public.is_hr_admin() to authenticated;
+grant execute on function public.is_ceo() to authenticated;
 grant execute on function public.is_my_team_member(integer) to authenticated;
 grant execute on function public.can_view_submission(integer) to authenticated;
 grant execute on function public.can_edit_submission(integer) to authenticated;
@@ -564,9 +587,18 @@ create policy training_submissions_select_hr on public.training_submissions
   using (public.is_hr_admin());
 
 -- An employee opens their own month, and only as a draft.
+-- The CEO sees the whole company, read only.
+create policy training_submissions_select_ceo on public.training_submissions
+  for select to authenticated
+  using (public.is_ceo());
+
 create policy training_submissions_insert_own on public.training_submissions
   for insert to authenticated
-  with check (employee_id = public.current_user_id() and status = 'draft');
+  with check (
+    employee_id = public.current_user_id()
+    and status = 'draft'
+    and not public.is_ceo()
+  );
 
 -- An employee edits their own month only while it is open to them. Which
 -- columns they may touch is enforced by enforce_submission_update_rules.
@@ -575,6 +607,7 @@ create policy training_submissions_update_own on public.training_submissions
   using (
     employee_id = public.current_user_id()
     and status in ('draft', 'returned_by_hod', 'rejected')
+    and not public.is_ceo()
   )
   with check (employee_id = public.current_user_id());
 
@@ -594,7 +627,11 @@ create policy training_submissions_update_hr on public.training_submissions
 -- An employee may discard a month only while it is still a draft.
 create policy training_submissions_delete_own_draft on public.training_submissions
   for delete to authenticated
-  using (employee_id = public.current_user_id() and status = 'draft');
+  using (
+    employee_id = public.current_user_id()
+    and status = 'draft'
+    and not public.is_ceo()
+  );
 
 -- ---------------------------------------------------------------------------
 -- training_records — visibility follows the parent submission, editing is
@@ -660,7 +697,7 @@ create policy training_attachments_delete_own on public.training_attachments
 
 create policy automation_logs_select_hr_admin on public.automation_logs
   for select to authenticated
-  using (public.is_hr_admin());
+  using (public.is_hr_admin() or public.is_ceo());
 
 -- ---------------------------------------------------------------------------
 -- Workflow enforcement
@@ -1024,6 +1061,7 @@ as $$
        and (
          r.requester_id = public.current_user_id()
          or public.is_hr_admin()
+         or public.is_ceo()
          or public.is_my_team_member(r.requester_id)
        )
   );
@@ -1060,6 +1098,13 @@ create policy requests_select_hr on public.requests
 
 -- Staff raise their own requests, and only in an opening state. Approving your
 -- own request by choosing the status on insert is what this forbids.
+-- The CEO sees every request, read only.
+drop policy if exists requests_select_ceo on public.requests;
+
+create policy requests_select_ceo on public.requests
+  for select to authenticated
+  using (public.is_ceo());
+
 drop policy if exists requests_insert_own on public.requests;
 
 create policy requests_insert_own on public.requests
@@ -1067,6 +1112,7 @@ create policy requests_insert_own on public.requests
   with check (
     requester_id = public.current_user_id()
     and status in ('submitted', 'pending_approval')
+    and not public.is_ceo()
   );
 
 -- The requester may still correct a request nobody has picked up yet. Which
@@ -1078,6 +1124,7 @@ create policy requests_update_own on public.requests
   using (
     requester_id = public.current_user_id()
     and status in ('submitted', 'pending_approval')
+    and not public.is_ceo()
   )
   with check (requester_id = public.current_user_id());
 
@@ -1087,8 +1134,14 @@ drop policy if exists requests_update_reviewer on public.requests;
 
 create policy requests_update_reviewer on public.requests
   for update to authenticated
-  using (public.is_hr_admin() or public.is_my_team_member(requester_id))
-  with check (public.is_hr_admin() or public.is_my_team_member(requester_id));
+  using (
+    (public.is_hr_admin() or public.is_my_team_member(requester_id))
+    and not public.is_ceo()
+  )
+  with check (
+    (public.is_hr_admin() or public.is_my_team_member(requester_id))
+    and not public.is_ceo()
+  );
 
 -- Comments follow the request: if you can see it, you can read and add them.
 drop policy if exists request_comments_select on public.request_comments;
@@ -1104,6 +1157,7 @@ create policy request_comments_insert on public.request_comments
   with check (
     author_id = public.current_user_id()
     and public.can_view_request(request_id)
+    and not public.is_ceo()
   );
 
 -- ---------------------------------------------------------------------------
@@ -1235,7 +1289,8 @@ create policy request_attachments_storage_delete on storage.objects
 
 -- IRIS demo data.
 --
--- 3 departments, 1 HR admin, 2 HODs, 8 staff. Every account uses the password
+-- 7 departments, 1 HR admin, 4 HODs, 2 staff, 1 CEO. Every account uses the
+-- password
 -- Password123! — development only.
 --
 -- Submissions cover 2025 in full and 2026 up to the current month (July),
@@ -1324,99 +1379,108 @@ $$;
 -- ---------------------------------------------------------------------------
 
 insert into public.departments (name) values
-  ('Software Development'),
   ('Sales'),
-  ('Support')
+  ('R&D'),
+  ('Support'),
+  ('HR'),
+  ('Finance'),
+  ('Support Engineer'),
+  ('Admin')
 on conflict (name) do nothing;
 
--- HR first: it has no department or reporting line of its own.
+-- The four HODs are created without a reporting line because they reference
+-- each other; the cross-links are set once every row exists.
 select public.seed_account(
-  '11111111-1111-1111-1111-111111111111', 'hr@irssoftware.test',
+  '22222222-2222-2222-2222-222222222222', 'ks@irs.com.my',
+  'Chng Kok Sheng', 'Head of R&D', 'hod',
+  'R&D', null, date '2016-04-11'
+);
+
+select public.seed_account(
+  '33333333-3333-3333-3333-333333333333', 'joshua@irs.com.my',
+  'Joshua', 'Head of Support', 'hod',
+  'Support', null, date '2017-02-06'
+);
+
+select public.seed_account(
+  '44444444-4444-4444-4444-444444444444', 'chen@irs.com.my',
+  'Ms. Chen', 'Head of Finance', 'hod',
+  'Finance', null, date '2015-09-14'
+);
+
+select public.seed_account(
+  '55555555-5555-5555-5555-555555555555', 'lee@irs.com.my',
+  'Ms. Lee', 'Head of HR', 'hod',
+  'HR', null, date '2016-11-21'
+);
+
+-- A HOD files a monthly record too, and that record still needs a HOD stage
+-- before it reaches HR. They are paired so each is verified by another HOD:
+-- the CEO cannot do it, because the CEO approves nothing.
+update public.users
+   set hod_id = (select id from public.users where email = 'joshua@irs.com.my')
+ where email = 'ks@irs.com.my';
+
+update public.users
+   set hod_id = (select id from public.users where email = 'ks@irs.com.my')
+ where email = 'joshua@irs.com.my';
+
+update public.users
+   set hod_id = (select id from public.users where email = 'lee@irs.com.my')
+ where email = 'chen@irs.com.my';
+
+update public.users
+   set hod_id = (select id from public.users where email = 'chen@irs.com.my')
+ where email = 'lee@irs.com.my';
+
+-- Joshua heads four departments; the others head one each.
+update public.departments
+   set hod_id = (select id from public.users where email = 'ks@irs.com.my')
+ where name = 'R&D';
+
+update public.departments
+   set hod_id = (select id from public.users where email = 'joshua@irs.com.my')
+ where name in ('Support', 'Sales', 'Admin', 'Support Engineer');
+
+update public.departments
+   set hod_id = (select id from public.users where email = 'chen@irs.com.my')
+ where name = 'Finance';
+
+update public.departments
+   set hod_id = (select id from public.users where email = 'lee@irs.com.my')
+ where name = 'HR';
+
+-- HR administers the system and sits in the HR department, so their own
+-- monthly record is verified by the head of HR before HR approves it.
+select public.seed_account(
+  '11111111-1111-1111-1111-111111111111', 'hr@irs.com.my',
   'Nurul Aina Binti Rahim', 'HR Manager', 'hr_admin',
-  null, null, date '2019-03-04'
+  'HR', 'lee@irs.com.my', date '2019-03-04'
 );
 
--- The HODs are created without a reporting line because they reference each
--- other; the cross-link is set once both rows exist.
+-- Two staff placeholders. The roster above is heads of department only, and
+-- staff are the people the training module is actually for — without at least
+-- one, there is no one to demonstrate the main flow as, and no subject for the
+-- tests that check an employee cannot see a colleague's records. Rename these
+-- to real employees when the roster is known.
 select public.seed_account(
-  '22222222-2222-2222-2222-222222222222', 'faizal@irssoftware.test',
-  'Mohd Faizal Bin Osman', 'Head of Software Development', 'hod',
-  'Software Development', null, date '2017-06-12'
-);
-
-select public.seed_account(
-  '33333333-3333-3333-3333-333333333333', 'sharon@irssoftware.test',
-  'Sharon Lim Wei Ling', 'Head of Sales and Support', 'hod',
-  'Sales', null, date '2018-01-22'
-);
-
--- Each HOD verifies the other's own submissions, so a HOD's personal record
--- still passes a HOD stage before it reaches HR.
-update public.users
-   set hod_id = (select id from public.users where email = 'sharon@irssoftware.test')
- where email = 'faizal@irssoftware.test';
-
-update public.users
-   set hod_id = (select id from public.users where email = 'faizal@irssoftware.test')
- where email = 'sharon@irssoftware.test';
-
-update public.departments
-   set hod_id = (select id from public.users where email = 'faizal@irssoftware.test')
- where name = 'Software Development';
-
-update public.departments
-   set hod_id = (select id from public.users where email = 'sharon@irssoftware.test')
- where name in ('Sales', 'Support');
-
--- Software Development reports to Faizal.
-select public.seed_account(
-  '44444444-4444-4444-4444-444444444444', 'aiman@irssoftware.test',
-  'Aiman Hakim Bin Zulkifli', 'Senior Software Engineer', 'staff',
-  'Software Development', 'faizal@irssoftware.test', date '2020-02-17'
+  '77777777-7777-7777-7777-777777777777', 'staff.rnd@irs.com.my',
+  'Demo Staff (R&D)', 'Software Engineer', 'staff',
+  'R&D', 'ks@irs.com.my', date '2022-05-09'
 );
 
 select public.seed_account(
-  '55555555-5555-5555-5555-555555555555', 'preetha@irssoftware.test',
-  'Preetha Devi A/P Ganesan', 'Software Engineer', 'staff',
-  'Software Development', 'faizal@irssoftware.test', date '2021-08-02'
+  '88888888-8888-8888-8888-888888888888', 'staff.support@irs.com.my',
+  'Demo Staff (Support)', 'Support Specialist', 'staff',
+  'Support', 'joshua@irs.com.my', date '2023-01-16'
 );
 
+-- The CEO reviews and reports. No department and no reporting line, because
+-- the CEO neither submits a record nor approves anyone else's.
 select public.seed_account(
-  '66666666-6666-6666-6666-666666666666', 'wenjie@irssoftware.test',
-  'Tan Wen Jie', 'QA Engineer', 'staff',
-  'Software Development', 'faizal@irssoftware.test', date '2022-04-11'
-);
-
-select public.seed_account(
-  '77777777-7777-7777-7777-777777777777', 'syafiq@irssoftware.test',
-  'Muhammad Syafiq Bin Ramli', 'Junior Software Engineer', 'staff',
-  'Software Development', 'faizal@irssoftware.test', date '2024-09-16'
-);
-
--- Sales reports to Sharon.
-select public.seed_account(
-  '88888888-8888-8888-8888-888888888888', 'nadia@irssoftware.test',
-  'Nadia Farhana Binti Yusof', 'Account Executive', 'staff',
-  'Sales', 'sharon@irssoftware.test', date '2021-11-08'
-);
-
-select public.seed_account(
-  '99999999-9999-9999-9999-999999999999', 'kumar@irssoftware.test',
-  'Kumaravel A/L Subramaniam', 'Sales Consultant', 'staff',
-  'Sales', 'sharon@irssoftware.test', date '2023-03-20'
-);
-
--- Support also reports to Sharon.
-select public.seed_account(
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'jasmine@irssoftware.test',
-  'Jasmine Chong Mei Yee', 'Support Specialist', 'staff',
-  'Support', 'sharon@irssoftware.test', date '2022-07-04'
-);
-
-select public.seed_account(
-  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'hafiz@irssoftware.test',
-  'Ahmad Hafiz Bin Ismail', 'Support Engineer', 'staff',
-  'Support', 'sharon@irssoftware.test', date '2023-10-02'
+  '66666666-6666-6666-6666-666666666666', 'polak@irs.com.my',
+  'Polak', 'Chief Executive Officer', 'ceo',
+  null, null, date '2014-01-06'
 );
 
 -- ---------------------------------------------------------------------------
@@ -1443,18 +1507,14 @@ create table public.seed_people (
 insert into public.seed_people (idx, id, base_minutes, catalogue)
 select v.idx, u.id, v.base_minutes, v.catalogue
   from (values
-    (0,  'faizal@irssoftware.test',  300, 'lead'),
-    (1,  'sharon@irssoftware.test',  285, 'lead'),
-    (2,  'aiman@irssoftware.test',   330, 'engineering'),
-    (3,  'preetha@irssoftware.test', 255, 'engineering'),
-    (4,  'wenjie@irssoftware.test',  195, 'engineering'),
-    (5,  'syafiq@irssoftware.test',  150, 'engineering'),
-    (6,  'nadia@irssoftware.test',   270, 'sales'),
-    (7,  'kumar@irssoftware.test',   165, 'sales'),
-    (8,  'jasmine@irssoftware.test', 240, 'support'),
-    (9,  'hafiz@irssoftware.test',   135, 'support'),
+    (0, 'ks@irs.com.my',     315, 'lead'),
+    (1, 'joshua@irs.com.my', 260, 'lead'),
+    (2, 'chen@irs.com.my',   200, 'lead'),
+    (3, 'lee@irs.com.my',    170, 'lead'),
+    (4, 'staff.rnd@irs.com.my',     290, 'engineering'),
+    (5, 'staff.support@irs.com.my', 165, 'support'),
     -- HR records training of its own too.
-    (10, 'hr@irssoftware.test',      225, 'lead')
+    (6, 'hr@irs.com.my',            235, 'lead')
   ) as v (idx, email, base_minutes, catalogue)
   join public.users u on u.email = v.email;
 
@@ -1484,7 +1544,7 @@ declare
   v_effectiveness public.training_effectiveness;
   v_variance int;
 begin
-  select id into v_hr from public.users where email = 'hr@irssoftware.test';
+  select id into v_hr from public.users where email = 'hr@irs.com.my';
 
   for person in select * from public.seed_people order by idx loop
 
@@ -1705,7 +1765,7 @@ begin
   select s.id into v_submission
     from public.training_submissions s
     join public.users u on u.id = s.employee_id
-   where u.email = 'aiman@irssoftware.test'
+   where u.email = 'ks@irs.com.my'
      and s.month = 2 and s.year = 2026;
 
   if v_submission is null then
@@ -1745,7 +1805,7 @@ begin
   select s.id into v_submission
     from public.training_submissions s
     join public.users u on u.id = s.employee_id
-   where u.email = 'nadia@irssoftware.test'
+   where u.email = 'ks@irs.com.my'
      and s.month = 4 and s.year = 2026;
 
   if v_submission is null then
@@ -1825,81 +1885,81 @@ insert into public.requests (
   attachment_name, priority, assigned_department, approval_required, status,
   ai_suggestion, reviewed_by, reviewed_at, review_comment, created_time
 ) values
-  ((select id from public.users where email = 'aiman@irssoftware.test'),
+  ((select id from public.users where email = 'ks@irs.com.my'),
    'Second monitor for development work',
    'I need a new monitor because my current monitor is too small for reviewing code side by side.',
    'it_equipment', 89000, null, 'normal', 'IT', true, 'approved',
    '{"category":"it_equipment","department":"IT","priority":"normal","approvalRequired":true,"reason":"Equipment purchase usually requires manager or admin approval."}'::jsonb,
-   (select id from public.users where email = 'hr@irssoftware.test'),
+   (select id from public.users where email = 'hr@irs.com.my'),
    now() - interval '26 days', 'Approved. Collect from the IT store room.',
    now() - interval '28 days'),
 
-  ((select id from public.users where email = 'preetha@irssoftware.test'),
+  ((select id from public.users where email = 'joshua@irs.com.my'),
    'Laptop will not power on',
    'My laptop is broken and will not start, I cannot work until it is repaired.',
    'it_equipment', 0, 'fault-report.pdf', 'urgent', 'IT', true, 'completed',
    '{"category":"it_equipment","department":"IT","priority":"urgent","approvalRequired":true,"reason":"Wording suggests work is blocked, so this is raised as urgent."}'::jsonb,
-   (select id from public.users where email = 'hr@irssoftware.test'),
+   (select id from public.users where email = 'hr@irs.com.my'),
    now() - interval '20 days', 'Replacement unit issued while the board is repaired.',
    now() - interval '21 days'),
 
-  ((select id from public.users where email = 'wenjie@irssoftware.test'),
+  ((select id from public.users where email = 'chen@irs.com.my'),
    'Ergonomic chair replacement',
    'My chair is damaged and the back support no longer holds position.',
    'office_furniture', 65000, null, 'high', 'Admin', true, 'in_progress',
    '{"category":"office_furniture","department":"Admin","priority":"high","approvalRequired":true,"reason":"Replacement of damaged furniture is treated as high priority."}'::jsonb,
-   (select id from public.users where email = 'hr@irssoftware.test'),
+   (select id from public.users where email = 'hr@irs.com.my'),
    now() - interval '9 days', 'Approved, waiting on the supplier delivery.',
    now() - interval '12 days'),
 
-  ((select id from public.users where email = 'syafiq@irssoftware.test'),
+  ((select id from public.users where email = 'lee@irs.com.my'),
    'JetBrains licence for backend work',
    'Please install and license the JetBrains IDE on my workstation.',
    'software', 74000, null, 'normal', 'IT', true, 'pending_approval',
    '{"category":"software","department":"IT","priority":"normal","approvalRequired":true,"reason":"Software licences are purchased centrally and need approval."}'::jsonb,
    null, null, null, now() - interval '4 days'),
 
-  ((select id from public.users where email = 'nadia@irssoftware.test'),
+  ((select id from public.users where email = 'ks@irs.com.my'),
    'Name cards for client visits',
    'I need business cards printed with my new designation for upcoming client visits.',
    'name_card', 12000, null, 'normal', 'Admin', true, 'approved',
    '{"category":"name_card","department":"Admin","priority":"normal","approvalRequired":true,"reason":"Printed stationery is ordered by Admin in batches."}'::jsonb,
-   (select id from public.users where email = 'hr@irssoftware.test'),
+   (select id from public.users where email = 'hr@irs.com.my'),
    now() - interval '6 days', 'Approved, going out with the next print batch.',
    now() - interval '8 days'),
 
-  ((select id from public.users where email = 'kumar@irssoftware.test'),
+  ((select id from public.users where email = 'joshua@irs.com.my'),
    'Access card not opening the back door',
    'My access card has stopped working on the rear entrance, I have an access issue every morning.',
    'access_card', 0, null, 'high', 'Admin', false, 'in_progress',
    '{"category":"access_card","department":"Admin","priority":"high","approvalRequired":false,"reason":"Access problems are handled directly by Admin without a purchase approval."}'::jsonb,
    null, null, null, now() - interval '3 days'),
 
-  ((select id from public.users where email = 'jasmine@irssoftware.test'),
+  ((select id from public.users where email = 'chen@irs.com.my'),
    'Air conditioning in the support room',
    'The aircond in the support area is not cooling and needs maintenance.',
    'maintenance', 0, null, 'high', 'Facilities', false, 'submitted',
    '{"category":"maintenance","department":"Facilities","priority":"high","approvalRequired":false,"reason":"Building maintenance is raised directly with Facilities."}'::jsonb,
    null, null, null, now() - interval '1 day'),
 
-  ((select id from public.users where email = 'hafiz@irssoftware.test'),
+  ((select id from public.users where email = 'lee@irs.com.my'),
    'Standing desk converter',
    'A standing desk converter would be nice to have for the afternoons.',
    'office_furniture', 45000, null, 'low', 'Admin', true, 'rejected',
    '{"category":"office_furniture","department":"Admin","priority":"low","approvalRequired":true,"reason":"Described as nice to have, so raised at low priority."}'::jsonb,
-   (select id from public.users where email = 'hr@irssoftware.test'),
+   (select id from public.users where email = 'hr@irs.com.my'),
    now() - interval '14 days',
    'Not in this quarter budget. Please raise again in the next cycle.',
    now() - interval '16 days'),
 
-  ((select id from public.users where email = 'aiman@irssoftware.test'),
+  ((select id from public.users where email = 'ks@irs.com.my'),
    'Stationery for the sprint board',
    'Whiteboard markers, sticky notes and index cards for the team planning wall.',
    'office_equipment', 8500, null, 'low', 'Admin', false, 'completed',
    '{"category":"office_equipment","department":"Admin","priority":"low","approvalRequired":false,"reason":"Low value consumables are handled by Admin without approval."}'::jsonb,
    null, null, null, now() - interval '30 days'),
 
-  ((select id from public.users where email = 'faizal@irssoftware.test'),
+  ((select id from public.users where email = 'ks@irs.com.my'),
    'Printer in the meeting room jams constantly',
    'The meeting room printer jams on every second job and needs repair.',
    'it_equipment', 0, null, 'high', 'IT', true, 'pending_approval',
@@ -1908,7 +1968,7 @@ insert into public.requests (
 
 -- A short conversation on the requests still being handled.
 insert into public.request_comments (request_id, author_id, body, created_time)
-select r.id, (select id from public.users where email = 'hr@irssoftware.test'),
+select r.id, (select id from public.users where email = 'hr@irs.com.my'),
        'Supplier quoted two weeks. I will update once it ships.',
        now() - interval '8 days'
   from public.requests r where r.title = 'Ergonomic chair replacement';
@@ -1920,7 +1980,7 @@ select r.id, r.requester_id,
   from public.requests r where r.title = 'Ergonomic chair replacement';
 
 insert into public.request_comments (request_id, author_id, body, created_time)
-select r.id, (select id from public.users where email = 'hr@irssoftware.test'),
+select r.id, (select id from public.users where email = 'hr@irs.com.my'),
        'Raised with the building manager, they are attending this week.',
        now() - interval '2 days'
   from public.requests r where r.title = 'Access card not opening the back door';

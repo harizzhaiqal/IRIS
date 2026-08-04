@@ -23,6 +23,14 @@ export const EDITABLE_STATUSES: SubmissionStatus[] = [
   "rejected",
 ];
 
+/**
+ * The CEO reviews and reports and changes nothing. Every action in the UI is
+ * gated on this, and the database refuses the same writes independently.
+ */
+export function isReadOnlyRole(role: UserRole): boolean {
+  return role === "ceo";
+}
+
 export function isEditableStatus(status: SubmissionStatus): boolean {
   return EDITABLE_STATUSES.includes(status);
 }
@@ -46,6 +54,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   staff: "Staff",
   hod: "Head of department",
   hr_admin: "HR admin",
+  ceo: "Chief executive",
 };
 
 // ---------------------------------------------------------------------------

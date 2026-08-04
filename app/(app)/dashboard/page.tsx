@@ -16,7 +16,11 @@ export default async function DashboardPage() {
   // scoped by RLS.
   return (
     <div className="space-y-10">
-      {profile.role === "hr_admin" ? <HrDashboard profile={profile} /> : null}
+      {/* The CEO wants exactly what HR sees — company-wide compliance — and
+          that view is figures and links, with nothing to act on. */}
+      {profile.role === "hr_admin" || profile.role === "ceo" ? (
+        <HrDashboard profile={profile} />
+      ) : null}
       {profile.role === "hod" ? <HodDashboard profile={profile} /> : null}
       {profile.role === "staff" ? <StaffDashboard profile={profile} /> : null}
 

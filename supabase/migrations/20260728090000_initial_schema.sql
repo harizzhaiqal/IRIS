@@ -11,7 +11,10 @@
 -- Enums
 -- ---------------------------------------------------------------------------
 
-create type public.user_role as enum ('staff', 'hod', 'hr_admin');
+-- ceo is declared here rather than added later by ALTER TYPE: Postgres refuses
+-- to use a newly added enum value in the same transaction that added it, which
+-- would break setup.sql, since that file is a single paste.
+create type public.user_role as enum ('staff', 'hod', 'hr_admin', 'ceo');
 
 create type public.submission_status as enum (
   'draft',

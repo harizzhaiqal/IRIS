@@ -26,7 +26,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
-    roles: ["staff", "hod", "hr_admin"],
+    roles: ["staff", "hod", "hr_admin", "ceo"],
   },
   {
     href: "/training",
@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/requests",
     label: "Requests",
     icon: Inbox,
-    roles: ["staff", "hod", "hr_admin"],
+    roles: ["staff", "hod", "hr_admin", "ceo"],
   },
   {
     href: "/training/team",
@@ -50,7 +50,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/training/submissions",
     label: "All submissions",
     icon: ClipboardCheck,
-    roles: ["hr_admin"],
+    roles: ["hr_admin", "ceo"],
   },
 ];
 

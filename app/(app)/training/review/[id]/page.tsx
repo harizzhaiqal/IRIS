@@ -53,7 +53,7 @@ export default async function ReviewSubmissionPage({
 
   const employee = submission.employee;
   const backHref =
-    profile.role === "hr_admin" ? "/training/submissions" : "/training/team";
+    profile.role === "hod" ? "/training/team" : "/training/submissions";
 
   return (
     <div className="space-y-6">

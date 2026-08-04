@@ -14,6 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { redirect } from "next/navigation";
+
 import { requireProfile } from "@/lib/auth";
 import { getProfileName } from "@/lib/queries/users";
 import { getTargets } from "@/lib/queries/settings";
@@ -21,7 +23,7 @@ import {
   getSubmissionForMonth,
   listYearSubmissions,
 } from "@/lib/queries/submissions";
-import { isEditableStatus } from "@/lib/types";
+import { isEditableStatus, isReadOnlyRole } from "@/lib/types";
 import { minutesToHHMM } from "@/lib/utils/duration";
 import {
   daysUntilDeadline,
@@ -53,6 +55,9 @@ export default async function TrainingPage({
   searchParams: { month?: string; year?: string };
 }) {
   const profile = await requireProfile();
+
+  // The CEO keeps no record of their own; the company view is the useful page.
+  if (isReadOnlyRole(profile.role)) redirect("/training/submissions");
   const { month, year } = resolvePeriod(searchParams);
 
   const [targets, submission, yearSubmissions] = await Promise.all([

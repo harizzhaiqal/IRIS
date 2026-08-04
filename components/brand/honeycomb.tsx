@@ -1,19 +1,30 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The login backdrop: a few honeycomb cells blown far past any usable lattice
- * and cropped by the viewport.
+ * A few honeycomb cells blown far past any usable lattice and cropped by the
+ * viewport — the iRS hexagon used as scenery rather than pattern.
  *
  * The cells are pointy-top to match the company mark, and deliberately large
- * enough that they read as shapes rather than as pattern — at lattice scale the
- * texture competes with the form for attention.
+ * enough that they read as shapes rather than texture.
  */
 
 const VIEW_W = 1440;
 const VIEW_H = 900;
 
-const STROKE = "hsl(185 40% 62%)";
-const FILL = "hsl(185 55% 45%)";
+/** On the brand panel the cells become white; the per-cell opacities below are
+ *  tuned for a light surface, so the dark tone scales them down. */
+const TONES = {
+  light: {
+    stroke: "hsl(185 40% 62%)",
+    fill: "hsl(185 55% 45%)",
+    scale: 1,
+  },
+  dark: {
+    stroke: "#FFFFFF",
+    fill: "#FFFFFF",
+    scale: 0.42,
+  },
+} as const;
 
 function hexPath(cx: number, cy: number, r: number) {
   const w = r * 0.866;
@@ -30,9 +41,9 @@ function hexPath(cx: number, cy: number, r: number) {
 
 /**
  * Two clusters, top-left and bottom-right, so the diagonal between them stays
- * clear for the card. Neighbours are placed on true lattice offsets — 1.5r down
- * and 0.866r across — so the cells sit flush the way a honeycomb does rather
- * than merely overlapping.
+ * clear. Neighbours sit on true lattice offsets — 1.5r down and 0.866r across —
+ * so the cells meet flush the way a honeycomb does rather than merely
+ * overlapping.
  */
 const CELLS = [
   { cx: 40, cy: 60, r: 210, fill: false, opacity: 0.5 },
@@ -48,7 +59,15 @@ const CELLS = [
   },
 ];
 
-export function Honeycomb({ className }: { className?: string }) {
+export function Honeycomb({
+  tone = "light",
+  className,
+}: {
+  tone?: keyof typeof TONES;
+  className?: string;
+}) {
+  const t = TONES[tone];
+
   return (
     <div
       aria-hidden
@@ -64,11 +83,11 @@ export function Honeycomb({ className }: { className?: string }) {
           <path
             key={i}
             d={hexPath(cell.cx, cell.cy, cell.r)}
-            opacity={cell.opacity}
+            opacity={cell.opacity * t.scale}
             {...(cell.fill
-              ? { fill: FILL }
+              ? { fill: t.fill }
               : {
-                  stroke: STROKE,
+                  stroke: t.stroke,
                   strokeWidth: 3,
                   strokeLinejoin: "round" as const,
                 })}

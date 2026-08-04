@@ -49,6 +49,7 @@ constraint, and reviewers are shown both numbers side by side.
 | `staff` | Record and submit their own training |
 | `hod` | Verify their team's submissions first; also submit their own record |
 | `hr_admin` | Verify second, and monitor everyone |
+| `ceo` | Read the whole company. Submits nothing, approves nothing. |
 
 ## Local setup
 
@@ -151,20 +152,24 @@ Every seeded account uses the password **`Password123!`**.
 
 | Email | Name | Role |
 | --- | --- | --- |
-| `hr@irssoftware.test` | Nurul Aina Binti Rahim | HR admin |
-| `faizal@irssoftware.test` | Mohd Faizal Bin Osman | HOD — Software Development |
-| `sharon@irssoftware.test` | Sharon Lim Wei Ling | HOD — Sales and Support |
-| `aiman@irssoftware.test` | Aiman Hakim Bin Zulkifli | Staff — Software Development |
-| `preetha@irssoftware.test` | Preetha Devi A/P Ganesan | Staff — Software Development |
-| `wenjie@irssoftware.test` | Tan Wen Jie | Staff — Software Development |
-| `syafiq@irssoftware.test` | Muhammad Syafiq Bin Ramli | Staff — Software Development |
-| `nadia@irssoftware.test` | Nadia Farhana Binti Yusof | Staff — Sales |
-| `kumar@irssoftware.test` | Kumaravel A/L Subramaniam | Staff — Sales |
-| `jasmine@irssoftware.test` | Jasmine Chong Mei Yee | Staff — Support |
-| `hafiz@irssoftware.test` | Ahmad Hafiz Bin Ismail | Staff — Support |
+| `polak@irs.com.my` | Polak | CEO — read only |
+| `hr@irs.com.my` | Nurul Aina Binti Rahim | HR admin |
+| `ks@irs.com.my` | Chng Kok Sheng | HOD — R&D |
+| `joshua@irs.com.my` | Joshua | HOD — Support, Sales, Admin, Support Engineer |
+| `chen@irs.com.my` | Ms. Chen | HOD — Finance |
+| `lee@irs.com.my` | Ms. Lee | HOD — HR |
+| `staff.rnd@irs.com.my` | Demo Staff (R&D) | Staff |
+| `staff.support@irs.com.my` | Demo Staff (Support) | Staff |
 
-The two HODs are each other's head of department, so a HOD's own monthly record
-still passes a HOD stage before it reaches HR.
+Departments: Sales, R&D, Support, HR, Finance, Support Engineer, Admin.
+
+The two staff rows are placeholders — the roster above is heads of department
+only, and the training module is for staff. Rename them once the real employees
+are known.
+
+The HODs are paired — Chng Kok Sheng with Joshua, Ms. Chen with Ms. Lee — so a
+HOD's own monthly record still passes a HOD stage before it reaches HR. The CEO
+cannot fill that stage, because the CEO approves nothing.
 
 Seeded data covers 2025 in full and 2026 through July, spanning every status
 including nil returns and overdue months. Aiman's February 2026 record contains

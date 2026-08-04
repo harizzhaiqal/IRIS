@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,10 +13,8 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
 
-/**
- * `bare` drops the card shell for layouts that already provide one — the
- * split-screen design puts the form directly on the page, not in a box.
- */
+/** `bare` drops the card shell for layouts that already provide one — the
+ *  split screen puts the form directly on the panel, not in a box. */
 export function LoginForm({
   redirectTo,
   bare = false,
@@ -61,30 +59,37 @@ export function LoginForm({
   const form = (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="name@irs.com.my"
-          autoComplete="email"
-          autoFocus
-          aria-invalid={Boolean(errors.email)}
-          {...register("email")}
-        />
+        <Label htmlFor="email">Your email</Label>
+        <div className="relative">
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@irs.com.my"
+            autoComplete="email"
+            autoFocus
+            aria-invalid={Boolean(errors.email)}
+            className="pr-10"
+            {...register("email")}
+          />
+          <Mail
+            aria-hidden
+            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          />
+        </div>
         {errors.email ? (
           <p className="text-sm text-destructive">{errors.email.message}</p>
         ) : null}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">Your password</Label>
         <div className="relative">
           <Input
             id="password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
-            className="pr-10"
             aria-invalid={Boolean(errors.password)}
+            className="pr-10"
             {...register("password")}
           />
           <button
@@ -123,7 +128,7 @@ export function LoginForm({
         ) : (
           <>
             <LogIn className="h-4 w-4" />
-            Sign in
+            Log in
           </>
         )}
       </Button>

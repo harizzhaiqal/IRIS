@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { requireProfile } from "@/lib/auth";
 import { getRequest } from "@/lib/queries/requests";
 import {
+  isReadOnlyRole,
   REQUEST_CATEGORY_LABELS,
   REQUEST_PRIORITY_LABELS,
   type RequestCategory,
@@ -79,7 +80,8 @@ export default async function RequestDetailPage({
   if (!request) notFound();
 
   const isOwnRequest = request.requester?.id === profile.id;
-  const isReviewer = profile.role !== "staff";
+  const readOnly = isReadOnlyRole(profile.role);
+  const isReviewer = profile.role !== "staff" && !readOnly;
 
   const suggestion = (request.ai_suggestion ?? null) as StoredSuggestion | null;
 
@@ -280,9 +282,12 @@ export default async function RequestDetailPage({
             </ul>
           )}
 
-          <Separator />
-
-          <CommentForm requestId={request.id} />
+          {readOnly ? null : (
+            <>
+              <Separator />
+              <CommentForm requestId={request.id} />
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

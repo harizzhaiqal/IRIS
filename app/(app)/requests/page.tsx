@@ -12,6 +12,7 @@ import {
 import { requireProfile } from "@/lib/auth";
 import { listRequestDepartments, listRequests } from "@/lib/queries/requests";
 import {
+  isReadOnlyRole,
   REQUEST_CATEGORY_ORDER,
   REQUEST_PRIORITY_ORDER,
   REQUEST_STATUS_LABELS,
@@ -75,6 +76,7 @@ export default async function RequestsPage({
   // Reviewers see other people's names; staff only ever see their own, so the
   // requester column and filter would be a column of one repeated value.
   const isReviewer = profile.role !== "staff";
+  const canRaise = !isReadOnlyRole(profile.role);
 
   const counts = REQUEST_STATUS_ORDER.map((key) => ({
     key,
@@ -124,12 +126,14 @@ export default async function RequestsPage({
           </p>
         </div>
 
-        <Button asChild>
-          <Link href="/requests/new">
-            <Plus className="h-4 w-4" />
-            New request
-          </Link>
-        </Button>
+        {canRaise ? (
+          <Button asChild>
+            <Link href="/requests/new">
+              <Plus className="h-4 w-4" />
+              New request
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       <Card>
@@ -173,10 +177,12 @@ export default async function RequestsPage({
               description={
                 hasFilters
                   ? "Widen the status, category, or priority filter to see more."
-                  : "Raise a request for equipment, office items, or support and it will appear here."
+                  : canRaise
+                    ? "Raise a request for equipment, office items, or support and it will appear here."
+                    : "Requests raised across the company will appear here."
               }
               action={
-                hasFilters ? null : (
+                hasFilters || !canRaise ? null : (
                   <Button asChild size="sm">
                     <Link href="/requests/new">
                       <Plus className="h-4 w-4" />

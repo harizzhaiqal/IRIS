@@ -76,11 +76,11 @@ await db.exec(strip(read("supabase/seed.sql")));
 console.log("  migrations and seed applied");
 
 // Data the user typed in, which must survive the repair.
-const aiman = await db.query(
-  `select id, auth_user_id from public.users where email = 'aiman@irssoftware.test'`,
+const subject = await db.query(
+  `select id, auth_user_id from public.users where email = 'staff.rnd@irs.com.my'`,
 );
-const uid = aiman.rows[0].id;
-const authUid = aiman.rows[0].auth_user_id;
+const uid = subject.rows[0].id;
+const authUid = subject.rows[0].auth_user_id;
 
 const sub = await db.query(
   `insert into public.training_submissions (employee_id, month, year, status)

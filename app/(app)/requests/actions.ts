@@ -7,7 +7,7 @@ import { suggestRequest, type RequestSuggestion } from "@/lib/ai/suggestRequest"
 import { requireProfile } from "@/lib/auth";
 import { logAction } from "@/lib/automationLog";
 import { createClient } from "@/lib/supabase/server";
-import type { RequestStatus } from "@/lib/types";
+import { isReadOnlyRole, type RequestStatus } from "@/lib/types";
 import {
   createRequestSchema,
   requestCommentSchema,
@@ -48,6 +48,10 @@ export async function createRequest(
   input: unknown,
 ): Promise<ActionResult<{ requestId: number }>> {
   const profile = await requireProfile();
+
+  if (isReadOnlyRole(profile.role)) {
+    return failed("Your account has view-only access.");
+  }
 
   const parsed = createRequestSchema.safeParse(input);
   if (!parsed.success) {
@@ -124,6 +128,10 @@ const DECISION_LOG: Record<string, string> = {
 export async function decideRequest(input: unknown): Promise<ActionResult> {
   const profile = await requireProfile();
 
+  if (isReadOnlyRole(profile.role)) {
+    return failed("Your account has view-only access.");
+  }
+
   const parsed = requestDecisionSchema.safeParse(input);
   if (!parsed.success) {
     return failed(parsed.error.issues[0]?.message ?? "Check the decision and try again.");
@@ -187,6 +195,10 @@ export async function decideRequest(input: unknown): Promise<ActionResult> {
 
 export async function addRequestComment(input: unknown): Promise<ActionResult> {
   const profile = await requireProfile();
+
+  if (isReadOnlyRole(profile.role)) {
+    return failed("Your account has view-only access.");
+  }
 
   const parsed = requestCommentSchema.safeParse(input);
   if (!parsed.success) {
