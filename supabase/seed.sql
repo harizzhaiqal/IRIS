@@ -464,7 +464,7 @@ $$;
 -- The multi-day override case from the source workbook.
 --
 -- A course running 26-27 February, 09:00-17:00 each day, is 16 hours gross.
--- Aiman recorded 14 because the two lunch breaks do not count as learning.
+-- Chng Kok Sheng recorded 14 because the two lunch breaks are not learning.
 -- This is the case reviewers must be able to see and question.
 -- ---------------------------------------------------------------------------
 

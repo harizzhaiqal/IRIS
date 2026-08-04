@@ -172,8 +172,8 @@ HOD's own monthly record still passes a HOD stage before it reaches HR. The CEO
 cannot fill that stage, because the CEO approves nothing.
 
 Seeded data covers 2025 in full and 2026 through July, spanning every status
-including nil returns and overdue months. Aiman's February 2026 record contains
-the multi-day override case described above.
+including nil returns and overdue months. Chng Kok Sheng's February 2026 record
+contains the multi-day override case described above.
 
 ## Testing
 
