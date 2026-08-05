@@ -15,6 +15,7 @@
     "test:bundle": "node supabase/tests/verify-bundle.mjs",
     "sql:repair": "node scripts/build-repair-sql.mjs",
     "test:repair": "node supabase/tests/verify-repair.mjs",
+    "test:staff": "node supabase/tests/verify-staff-script.mjs",
     "sample:export": "tsx scripts/sample-export.ts"
   },
   "dependencies": {

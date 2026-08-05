@@ -1,36 +1,29 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Honeycomb scenery for the login brand panel, echoing the iRS hexagon.
+ * The honeycomb accent on the login brand panel — a cluster of cells tucked
+ * into the top-right corner, dissolving toward the headline.
  *
- * Three treatments, all built from one lattice so they stay in the same visual
- * family:
+ * An earlier revision tiled the whole panel. That made the pattern the
+ * background rather than a detail on it, and left no room for the treatments
+ * to differ from one another. Keeping it to one corner lets the rest of the
+ * panel carry the logo and copy.
  *
- * - `lattice`  an even tiled field, fading across the diagonal
- * - `layered`  that field plus oversized cropped cells for depth
- * - `scatter`  that field with a fifth of the cells filled, unevenly
- *
- * Cells are generated rather than stamped with <pattern> because two of the
- * three need individual cells to differ, and a pattern can only repeat one
- * stamp.
+ * The patch is drawn in its own coordinate space and positioned with CSS
+ * rather than scaled to fill the panel: a `slice`-scaled viewBox crops
+ * unpredictably as the panel's aspect ratio changes, which would drift the
+ * accent off-screen at some window sizes.
  */
 
-export type HoneycombVariant = "lattice" | "layered" | "scatter";
+const COLS = 5;
+const ROWS = 5;
 
-const VIEW_W = 1440;
-const VIEW_H = 900;
-
-/** Pointy-top, matching the orientation of the company mark. */
-const R = 52;
+const R = 40;
 const COL_STEP = R * Math.sqrt(3);
 const ROW_STEP = R * 1.5;
 
-/** Opacities below are authored for a light surface; `alpha` pulls them back
- *  for white-on-turquoise, which reads much hotter at the same value. */
-const TONES = {
-  light: { stroke: "hsl(185 40% 62%)", fill: "hsl(185 55% 45%)", alpha: 1 },
-  dark: { stroke: "#FFFFFF", fill: "#FFFFFF", alpha: 0.6 },
-} as const;
+const WIDTH = COLS * COL_STEP + R * 0.866;
+const HEIGHT = (ROWS - 1) * ROW_STEP + R * 2;
 
 function hexPath(cx: number, cy: number, r: number) {
   const w = r * 0.866;
@@ -52,122 +45,70 @@ function noise(col: number, row: number) {
   return v - Math.floor(v);
 }
 
-type Cell = { key: string; d: string; col: number; row: number };
+/** Roughly one cell in four is solid, so the patch has some weight instead of
+ *  reading as wireframe only. */
+const CELLS = Array.from({ length: ROWS }, (_, row) =>
+  Array.from({ length: COLS }, (_, col) => ({
+    key: `${col}:${row}`,
+    cx: R * 0.866 + col * COL_STEP + (row % 2 ? COL_STEP / 2 : 0),
+    cy: R + row * ROW_STEP,
+    solid: noise(col, row) < 0.26,
+  })),
+).flat();
 
-const CELLS: Cell[] = (() => {
-  const out: Cell[] = [];
-  const cols = Math.ceil(VIEW_W / COL_STEP) + 2;
-  const rows = Math.ceil(VIEW_H / ROW_STEP) + 2;
-
-  for (let row = -1; row < rows; row++) {
-    for (let col = -1; col < cols; col++) {
-      const cx = col * COL_STEP + (row % 2 === 0 ? 0 : COL_STEP / 2);
-      const cy = row * ROW_STEP;
-      out.push({ key: `${col}:${row}`, d: hexPath(cx, cy, R), col, row });
-    }
-  }
-  return out;
-})();
-
-/** Oversized cells for `layered`. Neighbours sit on true lattice offsets —
- *  1.5r down, 0.866r across — so they meet flush rather than just overlapping. */
-const BIG = [
-  { cx: 40, cy: 60, r: 210, fill: false, opacity: 0.55 },
-  { cx: 40, cy: 60 + 210 * 1.5, r: 210, fill: true, opacity: 0.16 },
-  { cx: 40 + 210 * 0.866, cy: 60 + 210 * 0.75, r: 105, fill: true, opacity: 0.24 },
-  { cx: VIEW_W - 20, cy: VIEW_H - 40, r: 260, fill: false, opacity: 0.5 },
-  {
-    cx: VIEW_W - 20 - 260 * 0.866,
-    cy: VIEW_H - 40 - 260 * 0.75,
-    r: 130,
-    fill: true,
-    opacity: 0.18,
-  },
-];
-
-export function Honeycomb({
-  variant = "layered",
-  tone = "light",
-  className,
-}: {
-  variant?: HoneycombVariant;
-  tone?: keyof typeof TONES;
-  className?: string;
-}) {
-  const t = TONES[tone];
-  const id = `hc-${variant}-${tone}`;
-  const a = (o: number) => o * t.alpha;
-
+export function Honeycomb({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
-      className={cn("pointer-events-none absolute inset-0", className)}
+      className={cn(
+        "pointer-events-none absolute -right-14 -top-14 h-[15rem] w-[18rem] lg:h-[21rem] lg:w-[25rem]",
+        className,
+      )}
     >
       <svg
+        viewBox={`0 0 ${WIDTH.toFixed(0)} ${HEIGHT.toFixed(0)}`}
         className="h-full w-full"
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        preserveAspectRatio="xMidYMid slice"
+        preserveAspectRatio="xMidYMid meet"
         fill="none"
       >
         <defs>
-          {/* Strongest at the top-right, softest at the bottom-left, where the
-              headline and footer sit. Never fades to nothing — a lattice that
-              vanishes looks like a rendering bug. */}
-          <linearGradient id={`${id}-fade`} x1="1" y1="0" x2="0" y2="1">
+          {/* Solid at the top-right corner, gone by the bottom-left, so the
+              cluster fades into the panel rather than ending on a hard edge. */}
+          <linearGradient id="honeycomb-fade" x1="1" y1="0" x2="0.15" y2="1">
             <stop offset="0%" stopColor="#FFFFFF" />
-            <stop offset="55%" stopColor="#9A9A9A" />
-            <stop offset="100%" stopColor="#4D4D4D" />
+            <stop offset="55%" stopColor="#8A8A8A" />
+            <stop offset="100%" stopColor="#000000" />
           </linearGradient>
-          <mask id={`${id}-mask`}>
-            <rect width={VIEW_W} height={VIEW_H} fill={`url(#${id}-fade)`} />
+          <mask id="honeycomb-mask">
+            <rect
+              width={WIDTH}
+              height={HEIGHT}
+              fill="url(#honeycomb-fade)"
+            />
           </mask>
         </defs>
 
-        <g mask={`url(#${id}-mask)`}>
-          <g opacity={a(0.5)}>
-            {CELLS.map((c) => (
+        <g mask="url(#honeycomb-mask)">
+          {CELLS.map((c) =>
+            c.solid ? (
               <path
                 key={c.key}
-                d={c.d}
-                stroke={t.stroke}
-                strokeWidth={2}
-                strokeLinejoin="round"
+                d={hexPath(c.cx, c.cy, R)}
+                fill="#FFFFFF"
+                opacity={0.12}
               />
-            ))}
-          </g>
-
-          {variant === "scatter"
-            ? CELLS.map((c) => {
-                const n = noise(c.col, c.row);
-                if (n > 0.2) return null;
-                return (
-                  <path
-                    key={`f-${c.key}`}
-                    d={c.d}
-                    fill={t.fill}
-                    opacity={a(0.07 + (n / 0.2) * 0.16)}
-                  />
-                );
-              })
-            : null}
-        </g>
-
-        {variant === "layered"
-          ? BIG.map((h, i) => (
+            ) : (
               <path
-                key={`b-${i}`}
-                d={hexPath(h.cx, h.cy, h.r)}
-                opacity={a(h.opacity)}
-                {...(h.fill
-                  ? { fill: t.fill }
-                  : {
-                      stroke: t.stroke,
-                      strokeWidth: 3,
-                      strokeLinejoin: "round" as const,
-                    })}
+                key={c.key}
+                d={hexPath(c.cx, c.cy, R)}
+                stroke="#FFFFFF"
+                strokeWidth={2.5}
+                strokeLinejoin="round"
+                opacity={0.375}
               />
-            ))
-          : null}
+            ),
+          )}
+        </g>
       </svg>
     </div>
   );

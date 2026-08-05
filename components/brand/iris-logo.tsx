@@ -43,11 +43,11 @@ const HOLE =
   "radial-gradient(circle at 50% 50%, transparent 0 13%, #000 13.4%)";
 
 const SIZES = {
-  /** Login screen. The sheet's primary lockup, scaled to a 384px column. */
-  lg: { mark: 80, text: 60, gap: 24, tracking: "-0.03em", ring: true },
-  /** Brand panel on the split layouts. */
-  md: { mark: 48, text: 34, gap: 16, tracking: "-0.03em", ring: true },
-  /** The sheet's own "Website header" spec, used as-is. */
+  /** Login brand panel. Sized to own the panel rather than sit politely in the
+   *  corner of it — the lockup comes to ~316px inside 554px of usable width. */
+  xl: { mark: 128, text: 96, gap: 30, tracking: "-0.03em", ring: true },
+  /** The sheet's own "Website header" spec, used as-is. Also the mobile login
+   *  band, where the panel is only ~94px tall. */
   sm: { mark: 32, text: 22, gap: 14, tracking: "-0.02em", ring: false },
 } as const;
 
@@ -114,7 +114,7 @@ export function IrisMark({
 }
 
 export function IrisLogo({
-  size = "lg",
+  size = "sm",
   tone = "light",
   className,
 }: {
