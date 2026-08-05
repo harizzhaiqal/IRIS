@@ -118,7 +118,11 @@ export default async function RequestsPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Requests</h1>
+          {/* Titled to match the menu, which names this differently depending
+              on whether it is your own list or the company's. */}
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {canRaise ? "Requests" : "Request records"}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {isReviewer
               ? "Company requests for equipment, office items, and support."

@@ -140,6 +140,7 @@ await db.exec(`
   create role anon;
   create role authenticated;
   create role service_role;
+  alter role service_role bypassrls;
   grant usage on schema public, storage to anon, authenticated, service_role;
 `);
 console.log("  stubs installed");
@@ -175,6 +176,12 @@ await db.exec(
 );
 console.log("  applied without error");
 
+console.log("\n=== Migration 5: reminders ===");
+await db.exec(
+  stripExtensions(read("supabase/migrations/20260804120000_reminders.sql")),
+);
+console.log("  applied without error");
+
 // RLS is bypassed for the table owner, so force it for the test.
 //
 // Deliberately no GRANT here: the migration is expected to issue its own. It
@@ -188,6 +195,9 @@ await db.exec(`
   alter table public.automation_logs force row level security;
   alter table public.requests force row level security;
   alter table public.request_comments force row level security;
+  alter table public.reminder_schedules force row level security;
+  alter table public.reminder_runs force row level security;
+  alter table public.reminder_deliveries force row level security;
 `);
 
 // Assert the migration granted table access, rather than assuming it.
@@ -291,6 +301,88 @@ const uid = {};
       ),
     "non-DEFAULT value",
   );
+}
+
+console.log("\n=== Reminders: defaults, security and claiming ===");
+{
+  const initial = await db.query(
+    `select id, day_of_month, send_time::text, timezone, is_enabled,
+            audience, target_roles::text[]
+       from public.reminder_schedules`,
+  );
+  const reminderId = initial.rows[0]?.id;
+  check("a safe paused monthly reminder is installed",
+    initial.rows.length === 1 && initial.rows[0].day_of_month === 28 &&
+    initial.rows[0].send_time.startsWith("09:00") &&
+    initial.rows[0].timezone === "Asia/Kuala_Lumpur" &&
+    initial.rows[0].is_enabled === false);
+  check("the default targets staff and HOD accounts",
+    JSON.stringify(initial.rows[0]?.target_roles) === JSON.stringify(["staff", "hod"]));
+
+  for (const actor of [AUTH_UID.staffRnd, AUTH_UID.ks, AUTH_UID.ceo]) {
+    await asUser(actor, async () => {
+      const hidden = await db.query(
+        `select count(*)::int as n from public.reminder_schedules`,
+      );
+      check("a non-HR role cannot see reminder settings", hidden.rows[0].n === 0);
+    });
+  }
+
+  await asUser(AUTH_UID.staffRnd, async () => {
+    const changed = await db.query(
+      `update public.reminder_schedules set is_enabled = true where id = $1 returning id`,
+      [reminderId],
+    );
+    check("staff cannot enable a reminder", changed.rows.length === 0);
+  });
+
+  await asUser(AUTH_UID.hr, async () => {
+    const visible = await db.query(
+      `select count(*)::int as n from public.reminder_schedules`,
+    );
+    check("HR can see reminder settings", visible.rows[0].n === 1);
+
+    const enabled = await db.query(
+      `update public.reminder_schedules set is_enabled = true where id = $1
+       returning is_enabled, updated_by`,
+      [reminderId],
+    );
+    check("HR can enable the reminder",
+      enabled.rows[0]?.is_enabled === true && enabled.rows[0]?.updated_by === uid.hr);
+
+    await expectError("HR cannot invoke the service-only worker claim", () =>
+      db.query(
+        `select * from public.claim_due_reminder_runs('2026-08-28 01:00:00+00', 10)`,
+      ),
+      "permission denied");
+  });
+
+  await db.exec(`set role service_role;`);
+  const firstClaim = await db.query(
+    `select id, schedule_id, period_start, status, subject_snapshot
+       from public.claim_due_reminder_runs('2026-08-28 01:00:00+00', 10)`,
+  );
+  const secondClaim = await db.query(
+    `select id from public.claim_due_reminder_runs('2026-08-28 01:00:01+00', 10)`,
+  );
+  await db.exec(`reset role;`);
+
+  check("the service worker claims the due Malaysia-time reminder",
+    firstClaim.rows.length === 1 && firstClaim.rows[0].schedule_id === reminderId &&
+    new Date(firstClaim.rows[0].period_start).toISOString().startsWith("2026-08-01") &&
+    firstClaim.rows[0].status === "processing",
+    JSON.stringify(firstClaim.rows[0]));
+  check("a repeated worker call cannot claim the same monthly run twice",
+    secondClaim.rows.length === 0);
+
+  await asUser(AUTH_UID.staffRnd, async () => {
+    const hidden = await db.query(`select count(*)::int as n from public.reminder_runs`);
+    check("staff cannot see reminder delivery history", hidden.rows[0].n === 0);
+  });
+  await asUser(AUTH_UID.hr, async () => {
+    const visible = await db.query(`select count(*)::int as n from public.reminder_runs`);
+    check("HR can see reminder delivery history", visible.rows[0].n === 1);
+  });
 }
 
 console.log("\n=== Seed shape ===");

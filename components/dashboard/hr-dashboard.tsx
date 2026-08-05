@@ -1,15 +1,16 @@
 import Link from "next/link";
 import {
   AlertTriangle,
-  Building2,
   ClipboardCheck,
   ClipboardList,
+  Inbox,
   Users,
 } from "lucide-react";
 
+import { InsightCard } from "@/components/dashboard/insight-card";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { EmptyState } from "@/components/training/empty-state";
 import { TargetProgress } from "@/components/training/target-progress";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,16 +18,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { activityLabel, listRecentActivity } from "@/lib/queries/activity";
 import { listDepartments } from "@/lib/queries/departments";
 import { listActiveEmployees } from "@/lib/queries/profiles";
+import { listRequests } from "@/lib/queries/requests";
 import { getTargets } from "@/lib/queries/settings";
 import {
   listSubmissions,
   listYearSubmissionsForEmployees,
 } from "@/lib/queries/submissions";
-import type { Profile } from "@/lib/types";
+import {
+  REQUEST_CATEGORY_LABELS,
+  type Profile,
+} from "@/lib/types";
 import { minutesToHHMM } from "@/lib/utils/duration";
+import { formatCost } from "@/lib/utils/money";
+import { getRequestDashboardAnalytics } from "@/lib/utils/request-dashboard";
 import {
   hoursToMinutes,
   isOverdue,
@@ -39,16 +45,16 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
+  const isCeo = profile.role === "ceo";
 
-  const [targets, employees, departments, activity] = await Promise.all([
+  const [targets, employees, departments, requests] = await Promise.all([
     getTargets(),
     listActiveEmployees(),
     listDepartments(),
-    listRecentActivity(8),
+    listRequests(),
   ]);
 
   const employeeIds = employees.map((employee) => employee.id);
-
   const [monthSubmissions, yearSubmissions] = await Promise.all([
     listSubmissions({ month, year }),
     listYearSubmissionsForEmployees(employeeIds, year),
@@ -57,22 +63,18 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
   const byEmployeeThisMonth = new Map(
     monthSubmissions.map((row) => [row.employee_id, row]),
   );
-
   const submittedThisMonth = employees.filter((employee) => {
     const submission = byEmployeeThisMonth.get(employee.id);
     return submission && submission.status !== "draft";
   }).length;
-
+  const missingThisMonth = Math.max(0, employees.length - submittedThisMonth);
   const pendingHod = monthSubmissions.filter(
     (row) => row.status === "submitted_pending_hod",
   ).length;
-
   const pendingHr = monthSubmissions.filter(
     (row) => row.status === "hod_verified",
   ).length;
 
-  // Overdue is measured against the previous month, whose deadline has either
-  // passed or not; the current month is rarely overdue yet.
   const previousMonth = month === 1 ? 12 : month - 1;
   const previousYear = month === 1 ? year - 1 : year;
   const previousSubmissions = await listSubmissions({
@@ -82,8 +84,7 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
   const previousByEmployee = new Map(
     previousSubmissions.map((row) => [row.employee_id, row]),
   );
-
-  const overdue = employees.filter((employee) =>
+  const overdueTraining = employees.filter((employee) =>
     isOverdue(
       previousByEmployee.get(employee.id)?.status ?? null,
       previousMonth,
@@ -96,10 +97,8 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
   const perEmployee = employees.map((employee) => {
     const rows = yearSubmissions.filter((row) => row.employee_id === employee.id);
     const { approvedMinutes, pendingMinutes } = splitApprovedAndPending(rows);
-
     return { employee, approvedMinutes, pendingMinutes };
   });
-
   const totalApproved = perEmployee.reduce(
     (sum, entry) => sum + entry.approvedMinutes,
     0,
@@ -108,11 +107,11 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
     (sum, entry) => sum + entry.pendingMinutes,
     0,
   );
-
   const headcount = Math.max(1, employees.length);
-  const companyStandardTarget = hoursToMinutes(targets.yearlyStandardHours) * headcount;
-  const companyThresholdTarget = hoursToMinutes(targets.yearlyThresholdHours) * headcount;
-
+  const companyStandardTarget =
+    hoursToMinutes(targets.yearlyStandardHours) * headcount;
+  const companyThresholdTarget =
+    hoursToMinutes(targets.yearlyThresholdHours) * headcount;
   const standardPercent = percentOfTarget(
     totalApproved,
     targets.yearlyStandardHours * headcount,
@@ -121,32 +120,49 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
     totalApproved,
     targets.yearlyThresholdHours * headcount,
   );
+  const submissionRate = Math.round((submittedThisMonth / headcount) * 100);
 
   const departmentStats = departments
     .map((department) => {
       const members = perEmployee.filter(
         (entry) => entry.employee.department_id === department.id,
       );
-
       if (members.length === 0) return null;
-
-      const approved = members.reduce(
-        (sum, entry) => sum + entry.approvedMinutes,
-        0,
-      );
 
       return {
         department,
         headcount: members.length,
-        averageMinutes: Math.round(approved / members.length),
+        averageMinutes: Math.round(
+          members.reduce((sum, entry) => sum + entry.approvedMinutes, 0) /
+            members.length,
+        ),
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .sort((a, b) => a.averageMinutes - b.averageMinutes);
+    .sort((left, right) => left.averageMinutes - right.averageMinutes);
+  const lowestDepartment = departmentStats[0] ?? null;
 
-  const lowest = departmentStats[0] ?? null;
+  const requestAnalytics = getRequestDashboardAnalytics(requests, now);
+  const priorityActions =
+    overdueTraining + requestAnalytics.highPriorityActive.length;
+  const topCategory = requestAnalytics.topCategory
+    ? REQUEST_CATEGORY_LABELS[requestAnalytics.topCategory.category]
+    : null;
 
-  const submissionRate = Math.round((submittedThisMonth / headcount) * 100);
+  const insightPoints = [
+    topCategory && requestAnalytics.topCategory
+      ? `${topCategory} is the highest-demand request category with ${requestAnalytics.topCategory.count} active requests worth ${formatCost(requestAnalytics.topCategory.costCents)}.`
+      : "There are no active request categories requiring comparison.",
+    requestAnalytics.highPriorityActive.length > 0
+      ? `${requestAnalytics.highPriorityActive.length} high or urgent requests need closer attention.`
+      : "There are no high or urgent active requests.",
+    lowestDepartment
+      ? `${lowestDepartment.department.name} currently has the lowest approved training average at ${minutesToHHMM(lowestDepartment.averageMinutes)} per employee.`
+      : "Department training comparison will appear when employee records are available.",
+    overdueTraining > 0
+      ? `${overdueTraining} ${overdueTraining === 1 ? "employee is" : "employees are"} overdue for ${monthName(previousMonth)}.`
+      : `No employees are overdue for ${monthName(previousMonth)}.`,
+  ];
 
   return (
     <div className="space-y-6">
@@ -156,7 +172,7 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
             Welcome back, {profile.full_name.split(" ")[0]}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Company training compliance for {year}.
+            Company training compliance and request operations for {year}.
           </p>
         </div>
 
@@ -177,42 +193,52 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
           tone={submissionRate === 100 ? "success" : "default"}
         />
         <StatCard
-          label="Pending HOD"
-          value={pendingHod}
-          hint={`${monthName(month)} awaiting first verification`}
-          icon={ClipboardCheck}
-          tone={pendingHod > 0 ? "warning" : "default"}
-        />
-        <StatCard
           label="Pending HR"
           value={pendingHr}
-          hint="Verified and waiting on you"
+          hint="Verified and waiting for final approval"
           icon={ClipboardCheck}
           tone={pendingHr > 0 ? "warning" : "default"}
         />
         <StatCard
-          label="Overdue"
-          value={overdue}
-          hint={`${monthName(previousMonth)} past its deadline`}
+          label="Open requests"
+          value={requestAnalytics.active.length}
+          hint={`${formatCost(requestAnalytics.estimatedOpenCostCents)} estimated unresolved cost`}
+          icon={Inbox}
+        />
+        <StatCard
+          label="Priority actions"
+          value={priorityActions}
+          hint={`${overdueTraining} overdue training · ${requestAnalytics.highPriorityActive.length} high/urgent requests`}
           icon={AlertTriangle}
-          tone={overdue > 0 ? "destructive" : "success"}
+          tone={priorityActions > 0 ? "destructive" : "success"}
         />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Company compliance for {year}</CardTitle>
+          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+            <div className="space-y-1">
+              <CardTitle>Company compliance for {year}</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Approved hours count toward compliance; pending hours remain separate.
+              </p>
+            </div>
+            <Link
+              href="/training/submissions"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View report
+            </Link>
           </CardHeader>
           <CardContent className="space-y-5">
             <TargetProgress
-              label={`Approved against ${targets.yearlyStandardHours}h per head`}
+              label={`Approved against ${targets.yearlyStandardHours}h per employee`}
               approvedMinutes={totalApproved}
               pendingMinutes={totalPending}
               targetHours={targets.yearlyStandardHours * headcount}
             />
             <TargetProgress
-              label={`Approved against the ${targets.yearlyThresholdHours}h threshold per head`}
+              label={`Approved against the ${targets.yearlyThresholdHours}h minimum threshold`}
               approvedMinutes={totalApproved}
               targetHours={targets.yearlyThresholdHours * headcount}
             />
@@ -250,7 +276,7 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
                   {minutesToHHMM(totalPending)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Excluded from the figures above
+                  Excluded from approved progress
                 </p>
               </div>
             </div>
@@ -258,85 +284,171 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>By department</CardTitle>
+          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+            <div className="space-y-1">
+              <CardTitle>Request operations</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Current company workload
+              </p>
+            </div>
+            <Link
+              href="/requests"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View requests
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {lowest ? (
-              <div className="rounded-md border border-warning/50 bg-warning/5 p-3">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-                  <Building2 className="h-3.5 w-3.5" />
-                  Lowest performing
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-xl font-semibold tabular-nums">
+                  {requestAnalytics.pendingApproval.length}
                 </p>
-                <p className="mt-1 font-medium">{lowest.department.name}</p>
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {minutesToHHMM(lowest.averageMinutes)} approved per head across{" "}
-                  {lowest.headcount}{" "}
-                  {lowest.headcount === 1 ? "person" : "people"}
-                </p>
+                <p className="text-xs text-muted-foreground">Pending approval</p>
               </div>
-            ) : null}
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-xl font-semibold tabular-nums">
+                  {requestAnalytics.inProgress.length}
+                </p>
+                <p className="text-xs text-muted-foreground">In progress</p>
+              </div>
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-xl font-semibold tabular-nums">
+                  {requestAnalytics.highPriorityActive.length}
+                </p>
+                <p className="text-xs text-muted-foreground">High or urgent</p>
+              </div>
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-xl font-semibold tabular-nums">
+                  {requestAnalytics.recentlyCompleted.length}
+                </p>
+                <p className="text-xs text-muted-foreground">Completed in 30d</p>
+              </div>
+            </div>
 
-            <ul className="divide-y">
-              {departmentStats.map((entry) => (
-                <li
-                  key={entry.department.id}
-                  className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{entry.department.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {entry.headcount}{" "}
-                      {entry.headcount === 1 ? "person" : "people"}
-                    </p>
-                  </div>
-                  <span className="text-sm tabular-nums">
-                    {minutesToHHMM(entry.averageMinutes)}
-                  </span>
-                </li>
-              ))}
+            <ul className="mt-4 divide-y">
+              <li className="flex items-start justify-between gap-3 py-3 first:pt-0">
+                <div>
+                  <p className="text-sm font-medium">Highest demand</p>
+                  <p className="text-xs text-muted-foreground">
+                    {topCategory && requestAnalytics.topCategory
+                      ? `${topCategory} · ${requestAnalytics.topCategory.count} active`
+                      : "No active requests"}
+                  </p>
+                </div>
+                <span className="text-sm font-medium tabular-nums">
+                  {requestAnalytics.topCategory
+                    ? formatCost(requestAnalytics.topCategory.costCents)
+                    : "—"}
+                </span>
+              </li>
+              <li className="flex items-start justify-between gap-3 py-3 last:pb-0">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Oldest unresolved</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {requestAnalytics.oldestActive?.request.title ??
+                      "No unresolved requests"}
+                  </p>
+                </div>
+                {requestAnalytics.oldestActive ? (
+                  <Badge
+                    variant={
+                      requestAnalytics.oldestActive.ageDays >= 7
+                        ? "destructive"
+                        : "secondary"
+                    }
+                  >
+                    {requestAnalytics.oldestActive.ageDays === 0
+                      ? "Today"
+                      : `${requestAnalytics.oldestActive.ageDays}d`}
+                  </Badge>
+                ) : null}
+              </li>
             </ul>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {activity.length === 0 ? (
-            <EmptyState
-              icon={ClipboardList}
-              title="No activity recorded yet"
-              description="Submissions and verification decisions appear here as staff and reviewers work through the month."
-            />
-          ) : (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <InsightCard
+          summary={`${submissionRate}% of employees have submitted for ${monthName(month)}, while ${requestAnalytics.active.length} requests remain active.`}
+          insights={insightPoints}
+          scope={`Based on ${employees.length} active employees and ${requests.length} visible requests`}
+          badge={priorityActions > 0 ? "Attention" : "On track"}
+          badgeTone={priorityActions > 0 ? "warning" : "success"}
+          evidenceHref="/requests"
+        />
+
+        <Card>
+          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+            <div className="space-y-1">
+              <CardTitle>{isCeo ? "Company watchlist" : "Needs attention"}</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {isCeo
+                  ? "Items to monitor across the company."
+                  : "Items requiring HR follow-up."}
+              </p>
+            </div>
+            <Badge variant={priorityActions > 0 ? "warning" : "success"}>
+              {priorityActions}
+            </Badge>
+          </CardHeader>
+          <CardContent>
             <ul className="divide-y">
-              {activity.map((entry) => (
-                <li
-                  key={entry.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+              <li className="flex items-center justify-between gap-3 py-3 first:pt-0">
+                <div>
+                  <p className="text-sm font-medium">Submissions pending HR</p>
+                  <p className="text-xs text-muted-foreground">
+                    {pendingHod} are still at the HOD stage
+                  </p>
+                </div>
+                <Badge variant={pendingHr > 0 ? "warning" : "success"}>
+                  {pendingHr}
+                </Badge>
+              </li>
+              <li className="flex items-center justify-between gap-3 py-3">
+                <div>
+                  <p className="text-sm font-medium">High or urgent requests</p>
+                  <p className="text-xs text-muted-foreground">
+                    Prioritise these in the request queue
+                  </p>
+                </div>
+                <Badge
+                  variant={
+                    requestAnalytics.highPriorityActive.length > 0
+                      ? "destructive"
+                      : "success"
+                  }
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      {activityLabel(entry.action_type)}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {entry.description ?? "—"}
-                    </p>
-                  </div>
-                  <span className="whitespace-nowrap text-xs text-muted-foreground">
-                    {new Date(entry.created_time).toLocaleDateString(undefined, {
-                      dateStyle: "medium",
-                    })}
-                  </span>
-                </li>
-              ))}
+                  {requestAnalytics.highPriorityActive.length}
+                </Badge>
+              </li>
+              <li className="flex items-center justify-between gap-3 py-3">
+                <div>
+                  <p className="text-sm font-medium">Overdue training returns</p>
+                  <p className="text-xs text-muted-foreground">
+                    {monthName(previousMonth)} past its deadline
+                  </p>
+                </div>
+                <Badge variant={overdueTraining > 0 ? "destructive" : "success"}>
+                  {overdueTraining}
+                </Badge>
+              </li>
+              <li className="flex items-center justify-between gap-3 py-3 last:pb-0">
+                <div>
+                  <p className="text-sm font-medium">Missing current submissions</p>
+                  <p className="text-xs text-muted-foreground">
+                    No filed return yet for {monthName(month)}
+                  </p>
+                </div>
+                <Badge variant={missingThisMonth > 0 ? "secondary" : "success"}>
+                  {missingThisMonth}
+                </Badge>
+              </li>
             </ul>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

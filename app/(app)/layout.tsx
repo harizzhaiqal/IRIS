@@ -20,28 +20,28 @@ export default async function AppLayout({
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-background lg:flex">
         <SidebarHeader />
 
-        <div className="flex-1 p-3">
+        <div className="p-3">
           <SidebarNav role={profile.role} />
-        </div>
 
-        <div className="border-t p-3">
-          <div className="px-2 pb-2">
-            <p className="truncate text-sm font-medium">{profile.full_name}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {ROLE_LABELS[profile.role]}
-            </p>
+          <div className="mt-3 border-t pt-3">
+            <div className="px-2 pb-2">
+              <p className="truncate text-sm font-medium">{profile.full_name}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {ROLE_LABELS[profile.role]}
+              </p>
+            </div>
+            <form action="/auth/signout" method="post">
+              <Button
+                type="submit"
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-muted-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </Button>
+            </form>
           </div>
-          <form action="/auth/signout" method="post">
-            <Button
-              type="submit"
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-muted-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
-          </form>
         </div>
       </aside>
 

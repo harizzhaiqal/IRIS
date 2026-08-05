@@ -135,6 +135,7 @@ async function applyBundle(label) {
     "training_records",
     "requests",
     "request_comments",
+    "reminder_schedules",
   ]) {
     const { rows } = await db.query(`select count(*)::int as n from public.${table}`);
     counts[table] = rows[0].n;
@@ -178,6 +179,8 @@ check("training entries seeded", first.training_records > 100, `got ${first.trai
 check("8 auth accounts created", first.auth_users === 8, `got ${first.auth_users}`);
 check("10 demo requests seeded", first.requests === 10, `got ${first.requests}`);
 check("request comments seeded", first.request_comments >= 3, `got ${first.request_comments}`);
+check("one paused reminder is installed", first.reminder_schedules === 1,
+  `got ${first.reminder_schedules}`);
 
 const second = await applyBundle("Second run (re-run over existing data)");
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BellRing,
   ClipboardCheck,
   Inbox,
   LayoutDashboard,
@@ -21,6 +22,14 @@ type NavItem = {
   roles: UserRole[];
 };
 
+/**
+ * Ordered dashboard, training, requests, reminders.
+ *
+ * Two pairs of entries point at the same page under different names, because
+ * the same page means different things depending on who opens it: for staff and
+ * a HOD /requests is their own list, for HR and the CEO it is the company
+ * record. The roles are disjoint, so only one of each pair is ever rendered.
+ */
 const NAV_ITEMS: NavItem[] = [
   {
     href: "/dashboard",
@@ -35,12 +44,10 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["staff", "hod"],
   },
   {
-    // For staff and a HOD this lists their own; for HR and the CEO it is the
-    // company review queue. Same page, scoped by RLS.
-    href: "/requests",
-    label: "Requests",
-    icon: Inbox,
-    roles: ["staff", "hod", "hr_admin", "ceo"],
+    href: "/training/submissions",
+    label: "Training",
+    icon: NotebookPen,
+    roles: ["hr_admin", "ceo"],
   },
   {
     href: "/training/team",
@@ -49,10 +56,22 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["hod"],
   },
   {
-    href: "/training/submissions",
-    label: "All submissions",
+    href: "/requests",
+    label: "Requests",
+    icon: Inbox,
+    roles: ["staff", "hod"],
+  },
+  {
+    href: "/requests",
+    label: "Request records",
     icon: ClipboardCheck,
     roles: ["hr_admin", "ceo"],
+  },
+  {
+    href: "/reminders",
+    label: "Reminders",
+    icon: BellRing,
+    roles: ["hr_admin"],
   },
 ];
 
@@ -77,7 +96,9 @@ export function SidebarNav({ role }: { role: UserRole }) {
 
         return (
           <Link
-            key={item.href}
+            // Two entries can share an href under different labels, so the
+            // href alone is not a stable key.
+            key={`${item.href}-${item.label}`}
             href={item.href}
             aria-current={isActive ? "page" : undefined}
             className={cn(

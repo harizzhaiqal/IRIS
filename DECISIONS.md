@@ -195,3 +195,11 @@ Ambiguities resolved during the build, with the reasoning behind each choice.
 **This is enforced in the routes and actions, not in the database, and that is deliberate.** It is an organisational decision about scope, not a privilege boundary — HR remains the most privileged role and could reverse it from the staff list. The CEO's read-only rule is different in kind and is enforced in the policies as well, because that one is a boundary. Conflating the two would have meant either under-enforcing the CEO or hard-coding a reversible HR policy into the schema.
 
 **The test suite counts who files rather than restating it.** Two checks asserted seven employees with records; removing HR made both fail for a reason that had nothing to do with what they were testing. They now read the number from the data, so the next change to who files does not break them.
+
+## Menu naming and order
+
+**The menu reads dashboard, training, requests, reminders for every role.** The items each role sees differ, but the order does not, so someone describing the screen to a colleague on a different role is describing the same shape.
+
+**Two pairs of entries point at the same page under different names.** `/requests` is "Requests" for staff and a HOD and "Request records" for HR and the CEO, because for the first pair it is their own list and for the second it is the company's. The training pair is genuinely two pages — `/training` is the personal month, `/training/submissions` is the company view now labelled simply "Training". The roles on each pair are disjoint, so only one is ever rendered; the React key is href plus label rather than href alone, since the href is no longer unique.
+
+**Page headings follow the menu.** "All submissions" became "Training" and the requests heading switches on the same rule the menu uses, so a heading never disagrees with the item that was clicked to reach it.

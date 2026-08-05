@@ -288,6 +288,50 @@ Paste [`supabase/migrations/20260730120000_requests.sql`](supabase/migrations/20
 into the SQL Editor. Your existing training data is untouched. Use `setup.sql`
 only if you also want the demo requests, and remember it rebuilds everything.
 
+## Monthly email reminders
+
+The **Reminders** menu is available only to `hr_admin`. HR can create schedules,
+choose all active employees or only employees who have not submitted the current
+month's training record, preview personalized content, send a test to themselves,
+pause or enable automatic delivery, and inspect every recipient result.
+
+The installed example runs on the 28th at 09:00 Malaysia time and targets active
+staff and HOD accounts. It starts **paused** so applying the migration cannot send
+an email unexpectedly. Each monthly run and recipient has a database uniqueness
+constraint, and the provider request carries the same stable idempotency key, so
+a Cron retry cannot create a second email to the same person.
+
+### Add reminders to an existing database
+
+Apply [`supabase/migrations/20260804120000_reminders.sql`](supabase/migrations/20260804120000_reminders.sql)
+in the Supabase SQL Editor. This adds the reminder tables, HR-only RLS policies,
+default paused schedule, and service-only job claim function without touching
+existing training or request data.
+
+### Configure delivery
+
+1. Verify a company-owned sending domain with Resend and create an API key.
+2. Set `NEXT_PUBLIC_APP_URL`, `RESEND_API_KEY`, and `REMINDER_FROM_EMAIL` on the
+   Next.js host. These power links and the **Send test to me** action.
+3. Deploy the worker:
+
+   ```bash
+   npx supabase functions deploy send-reminders --project-ref YOUR_PROJECT_REF
+   ```
+
+4. Add `RESEND_API_KEY`, `REMINDER_FROM_EMAIL`, `IRIS_APP_URL`, and a long random
+   `REMINDER_CRON_SECRET` under Supabase Edge Function Secrets.
+5. Edit and run [`supabase/configure-reminder-cron.sql`](supabase/configure-reminder-cron.sql)
+   once. Use the same Cron secret and the hosted Supabase project URL. The job
+   checks for due work every 15 minutes; the schedule itself remains in Malaysia
+   time.
+6. Sign in as HR, open **Reminders**, send a test, then enable the schedule.
+
+Resend accepting a request is recorded as **Accepted**. Confirmed failures may be
+queued again with **Retry failed only**. Ambiguous interrupted responses are kept
+for manual review rather than risking a duplicate after the provider's
+idempotency window expires.
+
 ## Project layout
 
 ```
@@ -295,12 +339,14 @@ app/
   (app)/                 authenticated shell — sidebar, role-aware nav
     dashboard/           one route, three role views
     training/            employee's month view, entry form, review, team, HR list
+    reminders/           HR schedules, email preview, runs and recipient history
   login/                 email/password sign-in
   auth/signout/
 components/
   ui/                    shadcn/ui primitives
   training/              status badge, target progress, verification trail, entries table
   dashboard/             stat card and the three dashboard views
+  reminders/             reminder status presentation
 lib/
   supabase/              browser, server, and service-role clients, plus schema types
   queries/               typed query helpers, one file per entity
@@ -310,6 +356,7 @@ lib/
   automationLog.ts       the single writer for the audit trail
 supabase/
   migrations/            schema, RLS policies, workflow triggers
+  functions/             scheduled reminder email worker
   seed.sql               demo data
   setup.sql              generated: migrations + seed as one paste — REBUILDS, erases data
   repair.sql             generated: functions, policies and grants only — keeps data
@@ -350,14 +397,15 @@ of the schema points at. `public.current_user_id()` resolves the uuid in the
 caller's JWT to that integer, and is the only place the two meet.
 
 `total_minutes` is recomputed by the database on every write and cannot be forged
-from a client. The service-role key is used only in `lib/automationLog.ts` and
-never reaches the browser.
+from a client. The service-role key is limited to server-only audit logging and
+the scheduled reminder worker; it never reaches the browser.
 
 ## Out of scope
 
-The Requests and Commission modules, reports and exports, email sending, AI
-features, and the automation log page are deliberately not built. `automation_logs`
-is populated and ready for a viewer to be added later.
+The Commission module, reports, general-purpose exports, and the automation log
+page are deliberately not built. Request suggestions remain a deterministic
+prototype rather than a model call. `automation_logs` is populated and ready for
+a viewer to be added later.
 
 See [DECISIONS.md](DECISIONS.md) for the ambiguities resolved during the build
 and the reasoning behind each choice.

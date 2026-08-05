@@ -1,0 +1,684 @@
+# Key Page Dependency Trees
+
+These trees recursively trace local application imports for the primary product routes. External framework, Radix UI, React Hook Form, Zod, Supabase packages, and Lucide modules are intentionally omitted.
+
+## app\login\page.tsx
+
+Entry: app\login\page.tsx
+
+Dependencies:
+- app/login/page.tsx
+  - app/login/login-form.tsx
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/card.tsx
+      - lib/utils.ts
+    - components/ui/input.tsx
+      - lib/utils.ts
+    - components/ui/label.tsx
+      - lib/utils.ts
+    - lib/supabase/client.ts
+      - lib/supabase/database.types.ts
+    - lib/validation/auth.ts
+  - components/brand/honeycomb.tsx
+    - lib/utils.ts
+  - components/brand/iris-logo.tsx
+    - lib/utils.ts
+
+## app\(app)\dashboard\page.tsx
+
+Entry: app\(app)\dashboard\page.tsx
+
+Dependencies:
+- app/(app)/dashboard/page.tsx
+  - components/dashboard/hod-dashboard.tsx
+    - components/dashboard/stat-card.tsx
+      - components/ui/card.tsx
+        - lib/utils.ts
+      - lib/utils.ts
+    - components/training/empty-state.tsx
+    - components/training/status-badge.tsx
+      - components/ui/badge.tsx
+        - lib/utils.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/card.tsx
+      - lib/utils.ts
+    - lib/queries/profiles.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/queries/settings.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+    - lib/queries/submissions.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/duration.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - components/dashboard/hr-dashboard.tsx
+    - components/dashboard/stat-card.tsx
+      - components/ui/card.tsx
+        - lib/utils.ts
+      - lib/utils.ts
+    - components/training/empty-state.tsx
+    - components/training/target-progress.tsx
+      - components/ui/progress.tsx
+        - lib/utils.ts
+      - lib/utils.ts
+      - lib/utils/duration.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/card.tsx
+      - lib/utils.ts
+    - lib/queries/activity.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+    - lib/queries/departments.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+    - lib/queries/profiles.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/queries/settings.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+    - lib/queries/submissions.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/duration.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - components/dashboard/request-summary.tsx
+    - components/dashboard/stat-card.tsx
+      - components/ui/card.tsx
+        - lib/utils.ts
+      - lib/utils.ts
+    - components/requests/request-badges.tsx
+      - components/ui/badge.tsx
+        - lib/utils.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/card.tsx
+      - lib/utils.ts
+    - lib/queries/requests.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - components/dashboard/staff-dashboard.tsx
+    - components/dashboard/stat-card.tsx
+      - components/ui/card.tsx
+        - lib/utils.ts
+      - lib/utils.ts
+    - components/training/empty-state.tsx
+    - components/training/status-badge.tsx
+      - components/ui/badge.tsx
+        - lib/utils.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - components/training/target-progress.tsx
+      - components/ui/progress.tsx
+        - lib/utils.ts
+      - lib/utils.ts
+      - lib/utils/duration.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/card.tsx
+      - lib/utils.ts
+    - lib/queries/settings.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+    - lib/queries/submissions.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/duration.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - lib/auth.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+
+## app\(app)\training\page.tsx
+
+Entry: app\(app)\training\page.tsx
+
+Dependencies:
+- app/(app)/training/page.tsx
+  - app/(app)/training/entry-row-actions.tsx
+    - app/(app)/training/actions.ts
+      - lib/auth.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/automationLog.ts
+        - lib/supabase/admin.ts
+          - lib/supabase/database.types.ts
+      - lib/queries/settings.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/utils/targets.ts
+          - lib/types.ts
+            - lib/supabase/database.types.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+      - lib/utils/duration.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/validation/training.ts
+        - lib/utils/duration.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/dialog.tsx
+      - lib/utils.ts
+  - app/(app)/training/month-actions.tsx
+    - app/(app)/training/actions.ts
+      - lib/auth.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/automationLog.ts
+        - lib/supabase/admin.ts
+          - lib/supabase/database.types.ts
+      - lib/queries/settings.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/utils/targets.ts
+          - lib/types.ts
+            - lib/supabase/database.types.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+      - lib/utils/duration.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/validation/training.ts
+        - lib/utils/duration.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/dialog.tsx
+      - lib/utils.ts
+  - app/(app)/training/month-picker.tsx
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/select.tsx
+      - lib/utils.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - app/(app)/training/withdraw-nil-return.tsx
+    - app/(app)/training/actions.ts
+      - lib/auth.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/automationLog.ts
+        - lib/supabase/admin.ts
+          - lib/supabase/database.types.ts
+      - lib/queries/settings.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/utils/targets.ts
+          - lib/types.ts
+            - lib/supabase/database.types.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+      - lib/utils/duration.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/validation/training.ts
+        - lib/utils/duration.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+  - components/training/empty-state.tsx
+  - components/training/entries-table.tsx
+    - components/ui/table.tsx
+      - lib/utils.ts
+    - lib/queries/submissions.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/duration.ts
+  - components/training/status-badge.tsx
+    - components/ui/badge.tsx
+      - lib/utils.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - components/training/target-progress.tsx
+    - components/ui/progress.tsx
+      - lib/utils.ts
+    - lib/utils.ts
+    - lib/utils/duration.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - components/training/verification-trail.tsx
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils.ts
+  - components/ui/alert.tsx
+    - lib/utils.ts
+  - components/ui/button.tsx
+    - lib/utils.ts
+  - components/ui/card.tsx
+    - lib/utils.ts
+  - lib/auth.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/queries/profiles.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/queries/settings.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - lib/queries/submissions.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/types.ts
+    - lib/supabase/database.types.ts
+  - lib/utils/duration.ts
+  - lib/utils/targets.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+
+## app\(app)\training\new\page.tsx
+
+Entry: app\(app)\training\new\page.tsx
+
+Dependencies:
+- app/(app)/training/new/page.tsx
+  - app/(app)/training/new/entry-form.tsx
+    - app/(app)/training/actions.ts
+      - lib/auth.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/automationLog.ts
+        - lib/supabase/admin.ts
+          - lib/supabase/database.types.ts
+      - lib/queries/settings.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/utils/targets.ts
+          - lib/types.ts
+            - lib/supabase/database.types.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+      - lib/utils/duration.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/validation/training.ts
+        - lib/utils/duration.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/card.tsx
+      - lib/utils.ts
+    - components/ui/input.tsx
+      - lib/utils.ts
+    - components/ui/label.tsx
+      - lib/utils.ts
+    - components/ui/radio-group.tsx
+      - lib/utils.ts
+    - components/ui/textarea.tsx
+      - lib/utils.ts
+    - lib/supabase/client.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/duration.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/validation/training.ts
+      - lib/utils/duration.ts
+  - components/ui/button.tsx
+    - lib/utils.ts
+  - lib/auth.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/supabase/server.ts
+    - lib/supabase/database.types.ts
+  - lib/types.ts
+    - lib/supabase/database.types.ts
+  - lib/utils/duration.ts
+  - lib/utils/targets.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+
+## app\(app)\training\team\page.tsx
+
+Entry: app\(app)\training\team\page.tsx
+
+Dependencies:
+- app/(app)/training/team/page.tsx
+  - app/(app)/training/month-picker.tsx
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/select.tsx
+      - lib/utils.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - components/training/empty-state.tsx
+  - components/training/status-badge.tsx
+    - components/ui/badge.tsx
+      - lib/utils.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - components/ui/button.tsx
+    - lib/utils.ts
+  - components/ui/card.tsx
+    - lib/utils.ts
+  - components/ui/table.tsx
+    - lib/utils.ts
+  - lib/auth.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/queries/profiles.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/queries/settings.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - lib/queries/submissions.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/utils/duration.ts
+  - lib/utils/targets.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+
+## app\(app)\training\submissions\page.tsx
+
+Entry: app\(app)\training\submissions\page.tsx
+
+Dependencies:
+- app/(app)/training/submissions/page.tsx
+  - app/(app)/training/submissions/filters.tsx
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/label.tsx
+      - lib/utils.ts
+    - components/ui/select.tsx
+      - lib/utils.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - app/(app)/training/submissions/submissions-table.tsx
+    - app/(app)/training/review/actions.ts
+      - lib/auth.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/automationLog.ts
+        - lib/supabase/admin.ts
+          - lib/supabase/database.types.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+      - lib/utils/targets.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/validation/training.ts
+        - lib/utils/duration.ts
+    - components/training/status-badge.tsx
+      - components/ui/badge.tsx
+        - lib/utils.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/checkbox.tsx
+      - lib/utils.ts
+    - components/ui/table.tsx
+      - lib/utils.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/duration.ts
+    - lib/utils/targets.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+  - components/training/empty-state.tsx
+  - components/ui/card.tsx
+    - lib/utils.ts
+  - lib/auth.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/queries/departments.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+  - lib/queries/profiles.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/queries/submissions.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/types.ts
+    - lib/supabase/database.types.ts
+
+## app\(app)\requests\page.tsx
+
+Entry: app\(app)\requests\page.tsx
+
+Dependencies:
+- app/(app)/requests/page.tsx
+  - app/(app)/requests/filters.tsx
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/label.tsx
+      - lib/utils.ts
+    - components/ui/select.tsx
+      - lib/utils.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - app/(app)/requests/requests-table.tsx
+    - components/requests/request-badges.tsx
+      - components/ui/badge.tsx
+        - lib/utils.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/money.ts
+  - components/training/empty-state.tsx
+  - components/ui/button.tsx
+    - lib/utils.ts
+  - components/ui/card.tsx
+    - lib/utils.ts
+  - lib/auth.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/queries/requests.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/types.ts
+    - lib/supabase/database.types.ts
+
+## app\(app)\requests\new\page.tsx
+
+Entry: app\(app)\requests\new\page.tsx
+
+Dependencies:
+- app/(app)/requests/new/page.tsx
+  - app/(app)/requests/new/request-form.tsx
+    - app/(app)/requests/actions.ts
+      - lib/actionResult.ts
+      - lib/ai/suggestRequest.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/auth.ts
+        - lib/supabase/server.ts
+          - lib/supabase/database.types.ts
+        - lib/types.ts
+          - lib/supabase/database.types.ts
+      - lib/automationLog.ts
+        - lib/supabase/admin.ts
+          - lib/supabase/database.types.ts
+      - lib/supabase/server.ts
+        - lib/supabase/database.types.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+      - lib/validation/requests.ts
+        - lib/utils/money.ts
+    - components/ui/button.tsx
+      - lib/utils.ts
+    - components/ui/card.tsx
+      - lib/utils.ts
+    - components/ui/checkbox.tsx
+      - lib/utils.ts
+    - components/ui/input.tsx
+      - lib/utils.ts
+    - components/ui/label.tsx
+      - lib/utils.ts
+    - components/ui/select.tsx
+      - lib/utils.ts
+    - components/ui/textarea.tsx
+      - lib/utils.ts
+    - lib/ai/suggestRequest.ts
+      - lib/types.ts
+        - lib/supabase/database.types.ts
+    - lib/supabase/client.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+    - lib/utils/money.ts
+    - lib/validation/requests.ts
+      - lib/utils/money.ts
+  - components/ui/button.tsx
+    - lib/utils.ts
+  - lib/auth.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/types.ts
+    - lib/supabase/database.types.ts
+
+## app\(app)\reminders\page.tsx
+
+Entry: app\(app)\reminders\page.tsx
+
+Dependencies:
+- app/(app)/reminders/page.tsx
+  - components/reminders/run-status-badge.tsx
+    - components/ui/badge.tsx
+      - lib/utils.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - components/ui/alert.tsx
+    - lib/utils.ts
+  - components/ui/badge.tsx
+    - lib/utils.ts
+  - components/ui/button.tsx
+    - lib/utils.ts
+  - components/ui/card.tsx
+    - lib/utils.ts
+  - components/ui/table.tsx
+    - lib/utils.ts
+  - lib/auth.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/email/resend.ts
+  - lib/queries/reminders.ts
+    - lib/supabase/server.ts
+      - lib/supabase/database.types.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+  - lib/reminders/schedule.ts
+    - lib/types.ts
+      - lib/supabase/database.types.ts
+

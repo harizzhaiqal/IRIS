@@ -41,6 +41,17 @@ next-env.d.ts
 # supabase local
 /supabase/.branches
 /supabase/.temp
+/supabase/functions/.env
 
 # local agent settings
 .claude/settings.local.json
+
+# Superdesign temporary files
+.superdesign/tmp/
+.superdesign/npm-cache/
+
+# Local scratch files holding credentials. The key itself stays on disk;
+# it must never be committed.
+APIKEY.txt
+*.key
+secrets.txt

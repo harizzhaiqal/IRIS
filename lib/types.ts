@@ -6,6 +6,9 @@ export type Effectiveness = Enums<"training_effectiveness">;
 export type RequestStatus = Enums<"request_status">;
 export type RequestCategory = Enums<"request_category">;
 export type RequestPriority = Enums<"request_priority">;
+export type ReminderAudience = Enums<"reminder_audience">;
+export type ReminderRunStatus = Enums<"reminder_run_status">;
+export type ReminderDeliveryStatus = Enums<"reminder_delivery_status">;
 
 export type Profile = Tables<"profiles">;
 export type Department = Tables<"departments">;
@@ -15,6 +18,9 @@ export type TrainingRecord = Tables<"training_records">;
 export type TrainingAttachment = Tables<"training_attachments">;
 export type RequestRow = Tables<"requests">;
 export type RequestComment = Tables<"request_comments">;
+export type ReminderSchedule = Tables<"reminder_schedules">;
+export type ReminderRun = Tables<"reminder_runs">;
+export type ReminderDelivery = Tables<"reminder_deliveries">;
 
 /** The statuses in which an employee may still edit their month. */
 export const EDITABLE_STATUSES: SubmissionStatus[] = [

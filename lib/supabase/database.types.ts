@@ -195,6 +195,230 @@ export type Database = {
           },
         ];
       };
+      reminder_schedules: {
+        Row: {
+          id: number;
+          name: string;
+          is_enabled: boolean;
+          day_of_month: number;
+          send_time: string;
+          timezone: string;
+          audience: Database["public"]["Enums"]["reminder_audience"];
+          target_roles: Database["public"]["Enums"]["user_role"][];
+          subject: string;
+          body: string;
+          action_label: string | null;
+          action_url: string | null;
+          reply_to: string | null;
+          created_by: number | null;
+          updated_by: number | null;
+          created_time: string;
+          modified_time: string;
+        };
+        Insert: {
+          id?: never;
+          name: string;
+          is_enabled?: boolean;
+          day_of_month?: number;
+          send_time?: string;
+          timezone?: string;
+          audience?: Database["public"]["Enums"]["reminder_audience"];
+          target_roles?: Database["public"]["Enums"]["user_role"][];
+          subject: string;
+          body: string;
+          action_label?: string | null;
+          action_url?: string | null;
+          reply_to?: string | null;
+          created_by?: number | null;
+          updated_by?: number | null;
+          created_time?: string;
+          modified_time?: string;
+        };
+        Update: {
+          id?: never;
+          name?: string;
+          is_enabled?: boolean;
+          day_of_month?: number;
+          send_time?: string;
+          timezone?: string;
+          audience?: Database["public"]["Enums"]["reminder_audience"];
+          target_roles?: Database["public"]["Enums"]["user_role"][];
+          subject?: string;
+          body?: string;
+          action_label?: string | null;
+          action_url?: string | null;
+          reply_to?: string | null;
+          created_by?: number | null;
+          updated_by?: number | null;
+          created_time?: string;
+          modified_time?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reminder_schedules_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reminder_schedules_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reminder_runs: {
+        Row: {
+          id: number;
+          schedule_id: number;
+          period_start: string;
+          scheduled_for: string;
+          status: Database["public"]["Enums"]["reminder_run_status"];
+          audience_snapshot: Database["public"]["Enums"]["reminder_audience"];
+          target_roles_snapshot: Database["public"]["Enums"]["user_role"][];
+          subject_snapshot: string;
+          body_snapshot: string;
+          action_label_snapshot: string | null;
+          action_url_snapshot: string | null;
+          reply_to_snapshot: string | null;
+          recipient_count: number;
+          accepted_count: number;
+          failed_count: number;
+          attempt_count: number;
+          lease_expires_at: string | null;
+          started_at: string | null;
+          completed_at: string | null;
+          last_error: string | null;
+          created_time: string;
+        };
+        Insert: {
+          id?: never;
+          schedule_id: number;
+          period_start: string;
+          scheduled_for: string;
+          status?: Database["public"]["Enums"]["reminder_run_status"];
+          audience_snapshot: Database["public"]["Enums"]["reminder_audience"];
+          target_roles_snapshot: Database["public"]["Enums"]["user_role"][];
+          subject_snapshot: string;
+          body_snapshot: string;
+          action_label_snapshot?: string | null;
+          action_url_snapshot?: string | null;
+          reply_to_snapshot?: string | null;
+          recipient_count?: number;
+          accepted_count?: number;
+          failed_count?: number;
+          attempt_count?: number;
+          lease_expires_at?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          last_error?: string | null;
+          created_time?: string;
+        };
+        Update: {
+          id?: never;
+          schedule_id?: number;
+          period_start?: string;
+          scheduled_for?: string;
+          status?: Database["public"]["Enums"]["reminder_run_status"];
+          audience_snapshot?: Database["public"]["Enums"]["reminder_audience"];
+          target_roles_snapshot?: Database["public"]["Enums"]["user_role"][];
+          subject_snapshot?: string;
+          body_snapshot?: string;
+          action_label_snapshot?: string | null;
+          action_url_snapshot?: string | null;
+          reply_to_snapshot?: string | null;
+          recipient_count?: number;
+          accepted_count?: number;
+          failed_count?: number;
+          attempt_count?: number;
+          lease_expires_at?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          last_error?: string | null;
+          created_time?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reminder_runs_schedule_id_fkey";
+            columns: ["schedule_id"];
+            isOneToOne: false;
+            referencedRelation: "reminder_schedules";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reminder_deliveries: {
+        Row: {
+          id: number;
+          run_id: number;
+          recipient_profile_id: number | null;
+          recipient_name: string;
+          recipient_email: string;
+          status: Database["public"]["Enums"]["reminder_delivery_status"];
+          idempotency_key: string;
+          provider_message_id: string | null;
+          attempt_count: number;
+          last_attempt_at: string | null;
+          accepted_at: string | null;
+          delivered_at: string | null;
+          last_error: string | null;
+          created_time: string;
+          modified_time: string;
+        };
+        Insert: {
+          id?: never;
+          run_id: number;
+          recipient_profile_id?: number | null;
+          recipient_name: string;
+          recipient_email: string;
+          status?: Database["public"]["Enums"]["reminder_delivery_status"];
+          idempotency_key: string;
+          provider_message_id?: string | null;
+          attempt_count?: number;
+          last_attempt_at?: string | null;
+          accepted_at?: string | null;
+          delivered_at?: string | null;
+          last_error?: string | null;
+          created_time?: string;
+          modified_time?: string;
+        };
+        Update: {
+          id?: never;
+          run_id?: number;
+          recipient_profile_id?: number | null;
+          recipient_name?: string;
+          recipient_email?: string;
+          status?: Database["public"]["Enums"]["reminder_delivery_status"];
+          idempotency_key?: string;
+          provider_message_id?: string | null;
+          attempt_count?: number;
+          last_attempt_at?: string | null;
+          accepted_at?: string | null;
+          delivered_at?: string | null;
+          last_error?: string | null;
+          created_time?: string;
+          modified_time?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reminder_deliveries_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "reminder_runs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reminder_deliveries_recipient_profile_id_fkey";
+            columns: ["recipient_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       requests: {
         Row: {
           id: number;
@@ -518,6 +742,10 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      claim_due_reminder_runs: {
+        Args: { p_now?: string; p_lease_minutes?: number };
+        Returns: Database["public"]["Tables"]["reminder_runs"]["Row"][];
+      };
       is_hr_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
@@ -540,6 +768,21 @@ export type Database = {
       };
     };
     Enums: {
+      reminder_audience: "all_active_employees" | "incomplete_training";
+      reminder_run_status:
+        | "pending"
+        | "processing"
+        | "completed"
+        | "partial"
+        | "failed";
+      reminder_delivery_status:
+        | "pending"
+        | "processing"
+        | "accepted"
+        | "delivered"
+        | "failed"
+        | "unknown"
+        | "skipped";
       submission_status:
         | "draft"
         | "submitted_pending_hod"

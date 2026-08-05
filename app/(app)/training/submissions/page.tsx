@@ -15,7 +15,7 @@ import { STATUS_LABELS, type SubmissionStatus } from "@/lib/types";
 import { SubmissionFilters } from "./filters";
 import { SubmissionsTable, type SubmissionRow } from "./submissions-table";
 
-export const metadata = { title: "All submissions — IRIS" };
+export const metadata = { title: "Training — IRIS" };
 
 const STATUS_ORDER: SubmissionStatus[] = [
   "draft",
@@ -91,9 +91,10 @@ export default async function SubmissionsPage({
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">All submissions</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Training</h1>
         <p className="text-sm text-muted-foreground">
-          Company-wide training records and their verification stage.
+          Company-wide training records. Filter by staff, month, year,
+          department, or verification stage.
         </p>
       </div>
 
