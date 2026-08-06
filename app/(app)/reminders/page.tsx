@@ -105,9 +105,11 @@ export default async function RemindersPage() {
                   <div className="flex gap-3">
                     <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     <div><dt className="text-muted-foreground">Audience</dt><dd>
-                      {schedule.audience === "incomplete_training"
-                        ? "Employees who have not submitted"
-                        : "All active employees"}
+                      {schedule.is_test_mode
+                        ? "Test mode — one HR administrator"
+                        : schedule.audience === "incomplete_training"
+                          ? "Employees who have not submitted"
+                          : "All active employees"}
                     </dd></div>
                   </div>
                   <div className="flex gap-3">
@@ -159,7 +161,12 @@ export default async function RemindersPage() {
               </TableRow></TableHeader>
               <TableBody>{runs.map((run) => (
                 <TableRow key={run.id}>
-                  <TableCell className="font-medium">{names.get(run.schedule_id) ?? "Deleted reminder"}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span>{names.get(run.schedule_id) ?? "Deleted reminder"}</span>
+                      {run.is_test_mode_snapshot ? <Badge variant="warning">Test</Badge> : null}
+                    </div>
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">{malaysiaDateTime.format(new Date(run.scheduled_for))}</TableCell>
                   <TableCell><ReminderRunStatusBadge status={run.status} /></TableCell>
                   <TableCell>{run.recipient_count}</TableCell>

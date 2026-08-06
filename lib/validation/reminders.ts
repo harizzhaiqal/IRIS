@@ -26,6 +26,7 @@ export const reminderFormSchema = z
       .min(3, "Give this reminder a name")
       .max(100, "Keep the name under 100 characters"),
     isEnabled: z.boolean(),
+    isTestMode: z.boolean(),
     dayOfMonth: z.number().int().min(1).max(28),
     sendTime: z
       .string()

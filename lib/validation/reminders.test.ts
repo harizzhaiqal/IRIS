@@ -6,6 +6,7 @@ const valid = {
   reminderId: null,
   name: "Monthly training reminder",
   isEnabled: false,
+  isTestMode: false,
   dayOfMonth: 28,
   sendTime: "09:00",
   timezone: "Asia/Kuala_Lumpur" as const,

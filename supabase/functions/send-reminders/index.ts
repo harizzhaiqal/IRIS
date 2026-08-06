@@ -14,6 +14,8 @@ type ReminderRun = {
   id: number;
   schedule_id: number;
   period_start: string;
+  is_test_mode_snapshot: boolean;
+  test_recipient_profile_id_snapshot: number | null;
   audience_snapshot: "all_active_employees" | "incomplete_training";
   target_roles_snapshot: UserRole[];
   subject_snapshot: string;
@@ -54,6 +56,28 @@ function errorMessage(error: unknown): string {
 }
 
 async function selectRecipients(run: ReminderRun) {
+  if (run.is_test_mode_snapshot) {
+    if (!run.test_recipient_profile_id_snapshot) {
+      throw new Error("Test mode has no HR recipient configured.");
+    }
+
+    const { data: testRecipient, error: testRecipientError } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, role")
+      .eq("id", run.test_recipient_profile_id_snapshot)
+      .eq("is_active", true)
+      .eq("role", "hr_admin")
+      .maybeSingle();
+    if (testRecipientError) {
+      throw new Error(`Could not select the Test mode recipient: ${testRecipientError.message}`);
+    }
+    if (!testRecipient) {
+      throw new Error("The Test mode HR recipient is inactive or no longer available.");
+    }
+
+    return [testRecipient];
+  }
+
   const { data: profiles, error } = await supabase
     .from("profiles")
     .select("id, full_name, email, role")
@@ -151,7 +175,9 @@ async function sendDelivery(
       body: JSON.stringify({
         from: fromEmail,
         to: [delivery.recipient_email],
-        subject: email.subject,
+        subject: run.is_test_mode_snapshot
+          ? `[TEST] ${email.subject}`
+          : email.subject,
         html: email.html,
         text: email.text,
         ...(run.reply_to_snapshot
@@ -212,7 +238,7 @@ async function processRun(run: ReminderRun, deadlineDay: number) {
           recipient_name: recipient.full_name,
           recipient_email: recipient.email,
           status: "pending",
-          idempotency_key: `reminder/${run.schedule_id}/${run.period_start}/${recipient.id}`,
+          idempotency_key: `reminder/${run.schedule_id}/${run.period_start}/${run.is_test_mode_snapshot ? "test" : "live"}/${recipient.id}`,
         })),
         { onConflict: "run_id,recipient_email", ignoreDuplicates: true },
       );

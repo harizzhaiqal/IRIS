@@ -318,7 +318,10 @@ up to 50 MB; on a paid plan, both the app constant and bucket limit can be raise
 The **Reminders** menu is available only to `hr_admin`. HR can create schedules,
 choose all active employees or only employees who have not submitted the current
 month's training record, preview personalized content, send a test to themselves,
-pause or enable automatic delivery, and inspect every recipient result.
+pause or enable automatic delivery, and inspect every recipient result. **Test
+mode** runs through the real monthly Cron worker but sends only to the HR
+administrator who saved the schedule. Test and live runs are recorded separately,
+so an automatic test does not consume that month's company-wide send.
 
 The installed example runs on the 28th at 09:00 Malaysia time and targets active
 staff and HOD accounts. It starts **paused** so applying the migration cannot send
@@ -332,6 +335,10 @@ Apply [`supabase/migrations/20260804120000_reminders.sql`](supabase/migrations/2
 in the Supabase SQL Editor. This adds the reminder tables, HR-only RLS policies,
 default paused schedule, and service-only job claim function without touching
 existing training or request data.
+
+For a database where reminders were already installed, also apply
+[`supabase/migrations/20260807000000_reminder_test_mode.sql`](supabase/migrations/20260807000000_reminder_test_mode.sql)
+before redeploying the `send-reminders` Edge Function.
 
 ### Configure delivery
 

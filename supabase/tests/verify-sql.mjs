@@ -214,6 +214,12 @@ try {
   check("the AI media upload limits migration can be applied twice", false, error.message);
 }
 
+console.log("\n=== Migration 8: reminder Test mode ===");
+await db.exec(
+  stripExtensions(read("supabase/migrations/20260807000000_reminder_test_mode.sql")),
+);
+console.log("  applied without error");
+
 // RLS is bypassed for the table owner, so force it for the test.
 //
 // Deliberately no GRANT here: the migration is expected to issue its own. It
@@ -421,6 +427,7 @@ console.log("\n=== Reminders: defaults, security and claiming ===");
 {
   const initial = await db.query(
     `select id, day_of_month, send_time::text, timezone, is_enabled,
+            is_test_mode, test_recipient_profile_id,
             audience, target_roles::text[]
        from public.reminder_schedules`,
   );
@@ -429,7 +436,9 @@ console.log("\n=== Reminders: defaults, security and claiming ===");
     initial.rows.length === 1 && initial.rows[0].day_of_month === 28 &&
     initial.rows[0].send_time.startsWith("09:00") &&
     initial.rows[0].timezone === "Asia/Kuala_Lumpur" &&
-    initial.rows[0].is_enabled === false);
+    initial.rows[0].is_enabled === false &&
+    initial.rows[0].is_test_mode === false &&
+    initial.rows[0].test_recipient_profile_id === null);
   check("the default targets staff and HOD accounts",
     JSON.stringify(initial.rows[0]?.target_roles) === JSON.stringify(["staff", "hod"]));
 
@@ -457,12 +466,19 @@ console.log("\n=== Reminders: defaults, security and claiming ===");
     check("HR can see reminder settings", visible.rows[0].n === 1);
 
     const enabled = await db.query(
-      `update public.reminder_schedules set is_enabled = true where id = $1
-       returning is_enabled, updated_by`,
-      [reminderId],
+      `update public.reminder_schedules
+          set is_enabled = true,
+              is_test_mode = true,
+              test_recipient_profile_id = $2
+        where id = $1
+       returning is_enabled, is_test_mode, test_recipient_profile_id, updated_by`,
+      [reminderId, uid.hr],
     );
-    check("HR can enable the reminder",
-      enabled.rows[0]?.is_enabled === true && enabled.rows[0]?.updated_by === uid.hr);
+    check("HR can enable Test mode for themselves",
+      enabled.rows[0]?.is_enabled === true &&
+      enabled.rows[0]?.is_test_mode === true &&
+      enabled.rows[0]?.test_recipient_profile_id === uid.hr &&
+      enabled.rows[0]?.updated_by === uid.hr);
 
     await expectError("HR cannot invoke the service-only worker claim", () =>
       db.query(
@@ -473,7 +489,8 @@ console.log("\n=== Reminders: defaults, security and claiming ===");
 
   await db.exec(`set role service_role;`);
   const firstClaim = await db.query(
-    `select id, schedule_id, period_start, status, subject_snapshot
+    `select id, schedule_id, period_start, status, subject_snapshot,
+            is_test_mode_snapshot, test_recipient_profile_id_snapshot
        from public.claim_due_reminder_runs('2026-08-28 01:00:00+00', 10)`,
   );
   const secondClaim = await db.query(
@@ -484,10 +501,31 @@ console.log("\n=== Reminders: defaults, security and claiming ===");
   check("the service worker claims the due Malaysia-time reminder",
     firstClaim.rows.length === 1 && firstClaim.rows[0].schedule_id === reminderId &&
     new Date(firstClaim.rows[0].period_start).toISOString().startsWith("2026-08-01") &&
-    firstClaim.rows[0].status === "processing",
+    firstClaim.rows[0].status === "processing" &&
+    firstClaim.rows[0].is_test_mode_snapshot === true &&
+    firstClaim.rows[0].test_recipient_profile_id_snapshot === uid.hr,
     JSON.stringify(firstClaim.rows[0]));
   check("a repeated worker call cannot claim the same monthly run twice",
     secondClaim.rows.length === 0);
+
+  await asUser(AUTH_UID.hr, async () => {
+    await db.query(
+      `update public.reminder_schedules
+          set is_test_mode = false,
+              test_recipient_profile_id = null
+        where id = $1`,
+      [reminderId],
+    );
+  });
+  await db.exec(`set role service_role;`);
+  const liveClaim = await db.query(
+    `select id, is_test_mode_snapshot
+       from public.claim_due_reminder_runs('2026-08-28 01:00:02+00', 10)`,
+  );
+  await db.exec(`reset role;`);
+  check("a live run remains available after a Test mode run in the same month",
+    liveClaim.rows.length === 1 && liveClaim.rows[0].is_test_mode_snapshot === false,
+    JSON.stringify(liveClaim.rows));
 
   await asUser(AUTH_UID.staffRnd, async () => {
     const hidden = await db.query(`select count(*)::int as n from public.reminder_runs`);
@@ -495,7 +533,7 @@ console.log("\n=== Reminders: defaults, security and claiming ===");
   });
   await asUser(AUTH_UID.hr, async () => {
     const visible = await db.query(`select count(*)::int as n from public.reminder_runs`);
-    check("HR can see reminder delivery history", visible.rows[0].n === 1);
+    check("HR can see Test and live reminder history", visible.rows[0].n === 2);
   });
 }
 

@@ -14,7 +14,7 @@ create extension if not exists pg_net with schema extensions;
 create extension if not exists supabase_vault with schema vault;
 
 select vault.create_secret(
-  'https://YOUR_PROJECT_REF.supabase.co',
+  'https://f25118bbf665283688986cd5cc018eaf5108a22a568f6cf968c4dd05cdbbf844.supabase.co',
   'reminder_project_url',
   'IRIS project URL used by the reminder Cron job'
 );

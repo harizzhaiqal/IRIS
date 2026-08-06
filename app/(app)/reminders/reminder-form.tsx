@@ -37,6 +37,7 @@ const DEFAULT_VALUES: ReminderFormValues = {
   reminderId: null,
   name: "Monthly training record reminder",
   isEnabled: false,
+  isTestMode: false,
   dayOfMonth: 28,
   sendTime: "09:00",
   timezone: "Asia/Kuala_Lumpur",
@@ -56,6 +57,7 @@ function formValues(schedule: ReminderSchedule | null): ReminderFormValues {
     reminderId: schedule.id,
     name: schedule.name,
     isEnabled: schedule.is_enabled,
+    isTestMode: schedule.is_test_mode,
     dayOfMonth: schedule.day_of_month,
     sendTime: schedule.send_time.slice(0, 5),
     timezone: "Asia/Kuala_Lumpur",
@@ -107,6 +109,7 @@ export function ReminderForm({
   const watchedSubject = watch("subject");
   const watchedBody = watch("body");
   const watchedActionLabel = watch("actionLabel");
+  const watchedTestMode = watch("isTestMode");
   const context = useMemo(() => {
     const malaysiaNow = new Date(Date.now() + 8 * 60 * 60 * 1000);
     const periodStart = `${malaysiaNow.getUTCFullYear()}-${String(malaysiaNow.getUTCMonth() + 1).padStart(2, "0")}-01`;
@@ -183,6 +186,26 @@ export function ReminderForm({
                 )}
               />
 
+              <Controller
+                control={control}
+                name="isTestMode"
+                render={({ field }) => (
+                  <div className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-950">
+                    <Checkbox
+                      id="isTestMode"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="isTestMode">Test mode</Label>
+                      <p className="text-sm text-amber-900">
+                        Automatic runs send only to you at {testEmail}. The employee audience below is ignored until Test mode is turned off.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              />
+
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="dayOfMonth">Day of month</Label>
@@ -211,7 +234,7 @@ export function ReminderForm({
                   control={control}
                   name="audience"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={watchedTestMode}>
                       <SelectTrigger id="audience"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all_active_employees">All active employees</SelectItem>
@@ -233,6 +256,7 @@ export function ReminderForm({
                         <label key={role} className="flex items-center gap-2 text-sm">
                           <Checkbox
                             checked={field.value.includes(role)}
+                            disabled={watchedTestMode}
                             onCheckedChange={(checked) =>
                               field.onChange(
                                 checked === true
@@ -246,6 +270,11 @@ export function ReminderForm({
                       ))}
                     </div>
                     {errors.targetRoles ? <p className="text-sm text-destructive">{errors.targetRoles.message}</p> : null}
+                    {watchedTestMode ? (
+                      <p className="text-xs text-muted-foreground">
+                        These selections are saved for live delivery but are not used in Test mode.
+                      </p>
+                    ) : null}
                   </div>
                 )}
               />

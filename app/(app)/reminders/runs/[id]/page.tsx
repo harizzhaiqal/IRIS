@@ -42,7 +42,8 @@ export default async function ReminderRunPage({ params }: { params: { id: string
       <div className="space-y-3">
         <Button variant="ghost" size="sm" asChild><Link href="/reminders"><ArrowLeft className="h-4 w-4" />Back to reminders</Link></Button>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><h1 className="text-2xl font-semibold tracking-tight">{schedule?.name ?? "Reminder delivery"}</h1>
+          <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight">{schedule?.name ?? "Reminder delivery"}</h1>
+            {run.is_test_mode_snapshot ? <Badge variant="warning">Test mode</Badge> : null}</div>
             <p className="text-sm text-muted-foreground">Scheduled {dateTime.format(new Date(run.scheduled_for))}</p></div>
           <ReminderRunStatusBadge status={run.status} />
         </div>

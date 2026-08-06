@@ -250,6 +250,8 @@ export type Database = {
           id: number;
           name: string;
           is_enabled: boolean;
+          is_test_mode: boolean;
+          test_recipient_profile_id: number | null;
           day_of_month: number;
           send_time: string;
           timezone: string;
@@ -269,6 +271,8 @@ export type Database = {
           id?: never;
           name: string;
           is_enabled?: boolean;
+          is_test_mode?: boolean;
+          test_recipient_profile_id?: number | null;
           day_of_month?: number;
           send_time?: string;
           timezone?: string;
@@ -288,6 +292,8 @@ export type Database = {
           id?: never;
           name?: string;
           is_enabled?: boolean;
+          is_test_mode?: boolean;
+          test_recipient_profile_id?: number | null;
           day_of_month?: number;
           send_time?: string;
           timezone?: string;
@@ -318,6 +324,13 @@ export type Database = {
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "reminder_schedules_test_recipient_profile_id_fkey";
+            columns: ["test_recipient_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
         ];
       };
       reminder_runs: {
@@ -327,6 +340,8 @@ export type Database = {
           period_start: string;
           scheduled_for: string;
           status: Database["public"]["Enums"]["reminder_run_status"];
+          is_test_mode_snapshot: boolean;
+          test_recipient_profile_id_snapshot: number | null;
           audience_snapshot: Database["public"]["Enums"]["reminder_audience"];
           target_roles_snapshot: Database["public"]["Enums"]["user_role"][];
           subject_snapshot: string;
@@ -350,6 +365,8 @@ export type Database = {
           period_start: string;
           scheduled_for: string;
           status?: Database["public"]["Enums"]["reminder_run_status"];
+          is_test_mode_snapshot?: boolean;
+          test_recipient_profile_id_snapshot?: number | null;
           audience_snapshot: Database["public"]["Enums"]["reminder_audience"];
           target_roles_snapshot: Database["public"]["Enums"]["user_role"][];
           subject_snapshot: string;
@@ -373,6 +390,8 @@ export type Database = {
           period_start?: string;
           scheduled_for?: string;
           status?: Database["public"]["Enums"]["reminder_run_status"];
+          is_test_mode_snapshot?: boolean;
+          test_recipient_profile_id_snapshot?: number | null;
           audience_snapshot?: Database["public"]["Enums"]["reminder_audience"];
           target_roles_snapshot?: Database["public"]["Enums"]["user_role"][];
           subject_snapshot?: string;
@@ -396,6 +415,13 @@ export type Database = {
             columns: ["schedule_id"];
             isOneToOne: false;
             referencedRelation: "reminder_schedules";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reminder_runs_test_recipient_profile_id_snapshot_fkey";
+            columns: ["test_recipient_profile_id_snapshot"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];

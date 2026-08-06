@@ -50,6 +50,10 @@ export async function saveReminder(
   const values = {
     name: reminder.name,
     is_enabled: reminder.isEnabled,
+    is_test_mode: reminder.isTestMode,
+    test_recipient_profile_id: reminder.isTestMode
+      ? access.profile.id
+      : null,
     day_of_month: reminder.dayOfMonth,
     send_time: reminder.sendTime,
     timezone: reminder.timezone,
@@ -84,7 +88,7 @@ export async function saveReminder(
     actionType: reminder.reminderId
       ? "reminder.schedule_updated"
       : "reminder.schedule_created",
-    description: `${access.profile.full_name} ${reminder.reminderId ? "updated" : "created"} reminder "${reminder.name}"${reminder.isEnabled ? " and enabled it" : ""}`,
+    description: `${access.profile.full_name} ${reminder.reminderId ? "updated" : "created"} reminder "${reminder.name}"${reminder.isEnabled ? " and enabled it" : ""}${reminder.isTestMode ? ` in Test mode for ${access.profile.email}` : ""}`,
     relatedTable: "reminder_schedules",
     relatedId: saved.id,
     performedBy: access.profile.id,
