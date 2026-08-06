@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import { SidebarHeader } from "@/components/app-shell/sidebar-header";
 import { SidebarNav } from "@/components/app-shell/sidebar-nav";
 import { IrisLogo } from "@/components/brand/iris-logo";
+import { CommissionProvider } from "@/components/commission/commission-provider";
 import { Button } from "@/components/ui/button";
 import { requireProfile } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/types";
@@ -16,54 +17,58 @@ export default async function AppLayout({
   const profile = await requireProfile();
 
   return (
-    <div className="flex min-h-screen bg-muted/40">
-      <aside className="hidden w-60 shrink-0 flex-col border-r bg-background lg:flex">
-        <SidebarHeader />
+    <CommissionProvider
+      viewer={{ id: profile.id, name: profile.full_name, role: profile.role }}
+    >
+      <div className="flex min-h-screen bg-muted/40">
+        <aside className="hidden w-60 shrink-0 flex-col border-r bg-background lg:flex">
+          <SidebarHeader />
 
-        <div className="p-3">
-          <SidebarNav role={profile.role} />
+          <div className="p-3">
+            <SidebarNav role={profile.role} />
 
-          <div className="mt-3 border-t pt-3">
-            <div className="px-2 pb-2">
-              <p className="truncate text-sm font-medium">{profile.full_name}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {ROLE_LABELS[profile.role]}
-              </p>
+            <div className="mt-3 border-t pt-3">
+              <div className="px-2 pb-2">
+                <p className="truncate text-sm font-medium">{profile.full_name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {ROLE_LABELS[profile.role]}
+                </p>
+              </div>
+              <form action="/auth/signout" method="post">
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-muted-foreground"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </Button>
+              </form>
             </div>
+          </div>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-16 items-center justify-between gap-4 border-b bg-background px-4 lg:hidden">
+            <Link href="/dashboard" className="flex items-center">
+              <IrisLogo size="sm" />
+            </Link>
             <form action="/auth/signout" method="post">
-              <Button
-                type="submit"
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-muted-foreground"
-              >
+              <Button type="submit" variant="ghost" size="sm">
                 <LogOut className="h-4 w-4" />
                 Sign out
               </Button>
             </form>
+          </header>
+
+          <div className="border-b bg-background px-4 py-2 lg:hidden">
+            <SidebarNav role={profile.role} />
           </div>
+
+          <main className="min-w-0 flex-1 p-4 lg:p-8">{children}</main>
         </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between gap-4 border-b bg-background px-4 lg:hidden">
-          <Link href="/dashboard" className="flex items-center">
-            <IrisLogo size="sm" />
-          </Link>
-          <form action="/auth/signout" method="post">
-            <Button type="submit" variant="ghost" size="sm">
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
-          </form>
-        </header>
-
-        <div className="border-b bg-background px-4 py-2 lg:hidden">
-          <SidebarNav role={profile.role} />
-        </div>
-
-        <main className="min-w-0 flex-1 p-4 lg:p-8">{children}</main>
       </div>
-    </div>
+    </CommissionProvider>
   );
 }

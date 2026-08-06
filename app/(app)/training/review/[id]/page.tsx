@@ -53,7 +53,13 @@ export default async function ReviewSubmissionPage({
 
   const employee = submission.employee;
   const backHref =
-    profile.role === "hod" ? "/training/team" : "/training/submissions";
+    profile.role === "hod"
+      ? "/training/team"
+      : employee
+        ? `/training/staff/${employee.id}?month=${submission.month}&year=${submission.year}`
+        : "/training/submissions";
+  const backLabel =
+    profile.role === "hod" ? "Back to team submissions" : "Back to employee training";
 
   return (
     <div className="space-y-6">
@@ -61,7 +67,7 @@ export default async function ReviewSubmissionPage({
         <Button variant="ghost" size="sm" asChild className="-ml-3">
           <Link href={backHref}>
             <ArrowLeft className="h-4 w-4" />
-            Back to submissions
+            {backLabel}
           </Link>
         </Button>
 

@@ -18,17 +18,20 @@ export function MonthPicker({
   year,
   years,
   basePath = "/training",
+  resetKeys = [],
 }: {
   month: number;
   year: number;
   years: number[];
   basePath?: string;
+  resetKeys?: string[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   function go(nextMonth: number, nextYear: number) {
     const params = new URLSearchParams(searchParams.toString());
+    resetKeys.forEach((key) => params.delete(key));
     params.set("month", String(nextMonth));
     params.set("year", String(nextYear));
     router.push(`${basePath}?${params.toString()}`);

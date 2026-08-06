@@ -9,64 +9,76 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EFFECTIVENESS_LABELS } from "@/lib/types";
 import type { RecordWithAttachments } from "@/lib/queries/submissions";
+import { EFFECTIVENESS_LABELS } from "@/lib/types";
 import { minutesToHHMM } from "@/lib/utils/duration";
 
-function formatRange(start: string, end: string): string {
+function formatDateRange(start: string, end: string): string {
   const from = new Date(start);
   const to = new Date(end);
-
-  const sameDay = from.toDateString() === to.toDateString();
-  const dateOptions: Intl.DateTimeFormatOptions = {
+  const options: Intl.DateTimeFormatOptions = {
     day: "numeric",
     month: "short",
   };
-  const timeOptions: Intl.DateTimeFormatOptions = {
+
+  if (from.toDateString() === to.toDateString()) {
+    return from.toLocaleDateString(undefined, options);
+  }
+
+  return `${from.toLocaleDateString(undefined, options)}–${to.toLocaleDateString(
+    undefined,
+    options,
+  )}`;
+}
+
+function formatTimeRange(start: string, end: string): string {
+  const from = new Date(start);
+  const to = new Date(end);
+  const options: Intl.DateTimeFormatOptions = {
     hour: "2-digit",
     minute: "2-digit",
   };
 
-  if (sameDay) {
-    return `${from.toLocaleDateString(undefined, dateOptions)}, ${from.toLocaleTimeString(
-      undefined,
-      timeOptions,
-    )}–${to.toLocaleTimeString(undefined, timeOptions)}`;
-  }
-
-  return `${from.toLocaleDateString(undefined, dateOptions)}–${to.toLocaleDateString(
+  return `${from.toLocaleTimeString(undefined, options)}–${to.toLocaleTimeString(
     undefined,
-    dateOptions,
-  )}, ${from.toLocaleTimeString(undefined, timeOptions)}–${to.toLocaleTimeString(
-    undefined,
-    timeOptions,
+    options,
   )}`;
 }
 
-/**
- * The entries of one month. Where recorded hours differ from the calculated
- * duration, both are shown with the reason, because that discrepancy is the
- * thing a reviewer most needs to see.
- */
+/** A reusable record table with optional actions and supporting documents. */
 export function EntriesTable({
   records,
   renderActions,
+  actionsPosition = "end",
+  renderStatus,
+  showDocuments = true,
 }: {
   records: RecordWithAttachments[];
   renderActions?: (record: RecordWithAttachments) => React.ReactNode;
+  actionsPosition?: "start" | "end";
+  renderStatus?: (record: RecordWithAttachments) => React.ReactNode;
+  showDocuments?: boolean;
 }) {
+  const showFinalColumn = Boolean(renderStatus) || showDocuments;
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          {renderActions && actionsPosition === "start" ? (
+            <TableHead className="w-20">Action</TableHead>
+          ) : null}
           <TableHead className="w-10">#</TableHead>
           <TableHead>Training</TableHead>
-          <TableHead>When</TableHead>
+          <TableHead>Date</TableHead>
+          <TableHead>Time</TableHead>
           <TableHead className="text-right">Hours</TableHead>
           <TableHead>Effectiveness</TableHead>
-          <TableHead>Documents</TableHead>
-          {renderActions ? (
-            <TableHead className="text-right">Actions</TableHead>
+          {showFinalColumn ? (
+            <TableHead>{renderStatus ? "Status" : "Documents"}</TableHead>
+          ) : null}
+          {renderActions && actionsPosition === "end" ? (
+            <TableHead className="text-right">Action</TableHead>
           ) : null}
         </TableRow>
       </TableHeader>
@@ -78,6 +90,10 @@ export function EntriesTable({
 
           return (
             <TableRow key={record.id} className="align-top">
+              {renderActions && actionsPosition === "start" ? (
+                <TableCell>{renderActions(record)}</TableCell>
+              ) : null}
+
               <TableCell className="text-muted-foreground tabular-nums">
                 {record.seq_no}
               </TableCell>
@@ -97,7 +113,11 @@ export function EntriesTable({
               </TableCell>
 
               <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                {formatRange(record.start_datetime, record.end_datetime)}
+                {formatDateRange(record.start_datetime, record.end_datetime)}
+              </TableCell>
+
+              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                {formatTimeRange(record.start_datetime, record.end_datetime)}
               </TableCell>
 
               <TableCell className="text-right">
@@ -123,31 +143,35 @@ export function EntriesTable({
                 ) : null}
               </TableCell>
 
-              <TableCell>
-                {record.attachments.length === 0 ? (
-                  <span className="text-xs text-muted-foreground">None</span>
-                ) : (
-                  <ul className="space-y-1">
-                    {record.attachments.map((attachment) => (
-                      <li key={attachment.id}>
-                        <Link
-                          href={`/training/attachments/${attachment.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-xs text-primary underline-offset-4 hover:underline"
-                        >
-                          <Paperclip className="h-3 w-3 shrink-0" />
-                          <span className="max-w-[10rem] truncate">
-                            {attachment.file_name}
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </TableCell>
+              {showFinalColumn ? (
+                <TableCell>
+                  {renderStatus ? (
+                    renderStatus(record)
+                  ) : record.attachments.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">None</span>
+                  ) : (
+                    <ul className="space-y-1">
+                      {record.attachments.map((attachment) => (
+                        <li key={attachment.id}>
+                          <Link
+                            href={`/training/attachments/${attachment.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-xs text-primary underline-offset-4 hover:underline"
+                          >
+                            <Paperclip className="h-3 w-3 shrink-0" />
+                            <span className="max-w-[10rem] truncate">
+                              {attachment.file_name}
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </TableCell>
+              ) : null}
 
-              {renderActions ? (
+              {renderActions && actionsPosition === "end" ? (
                 <TableCell>{renderActions(record)}</TableCell>
               ) : null}
             </TableRow>

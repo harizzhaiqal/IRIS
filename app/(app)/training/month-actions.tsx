@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Loader2, Send, SlashSquare } from "lucide-react";
+import { AlertTriangle, Loader2, Send } from "lucide-react";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,27 +14,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { declareNilReturn, submitMonth } from "./actions";
+import { submitMonth } from "./actions";
 
 export function MonthActions({
   month,
   year,
   entryCount,
-  isNilReturn,
   entriesMissingAttachments,
 }: {
   month: number;
   year: number;
   entryCount: number;
-  isNilReturn: boolean;
   entriesMissingAttachments: string[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [nilOpen, setNilOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useGlobalPending(pending || isSubmitting, "Submitting month…");
 
   function runSubmit() {
     setError(null);
@@ -53,42 +52,19 @@ export function MonthActions({
     });
   }
 
-  function runNilReturn() {
-    setError(null);
-
-    startTransition(async () => {
-      const result = await declareNilReturn({ month, year });
-
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-
-      setNilOpen(false);
-      router.refresh();
-    });
-  }
-
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
           onClick={() => setConfirmOpen(true)}
-          disabled={entryCount === 0 && !isNilReturn}
+          disabled={entryCount === 0}
         >
           <Send className="h-4 w-4" />
-          {isNilReturn ? "Submit nil return" : "Submit month"}
+          Submit month
         </Button>
-
-        {entryCount === 0 && !isNilReturn ? (
-          <Button variant="outline" onClick={() => setNilOpen(true)}>
-            <SlashSquare className="h-4 w-4" />
-            Declare nil return
-          </Button>
-        ) : null}
       </div>
 
-      {error && !confirmOpen && !nilOpen ? (
+      {error && !confirmOpen ? (
         <p className="mt-2 text-sm text-destructive" role="alert">
           {error}
         </p>
@@ -144,34 +120,6 @@ export function MonthActions({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={nilOpen} onOpenChange={setNilOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Declare a nil return</DialogTitle>
-            <DialogDescription>
-              This records that you had no training this month, so HR can tell it
-              apart from a month you simply have not filled in yet. It still goes
-              through the usual verification.
-            </DialogDescription>
-          </DialogHeader>
-
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNilOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={runNilReturn} disabled={pending}>
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Declare nil return
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

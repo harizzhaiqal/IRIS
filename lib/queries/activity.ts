@@ -40,6 +40,11 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   "training_attachment.added": "Document attached",
   "training_attachment.removed": "Document removed",
   "profile.created": "Staff account created",
+  "commission.pdf_uploaded": "Commission PDF uploaded",
+  "commission.email_sent": "Commission email marked sent",
+  "commission.pdf_viewed": "Commission PDF viewed",
+  "commission.acknowledged": "Commission acknowledged",
+  "commission.reminder_sent": "Commission reminder sent",
 };
 
 export function activityLabel(actionType: string): string {

@@ -38,7 +38,7 @@ const LIST_SELECT = `
   *,
   employee:profiles!training_submissions_employee_id_fkey (
     id, full_name, designation,
-    department:departments ( id, name )
+    department:departments!profiles_department_id_fkey ( id, name )
   )
 `;
 
@@ -46,7 +46,7 @@ const DETAIL_SELECT = `
   *,
   employee:profiles!training_submissions_employee_id_fkey (
     id, full_name, email, designation, date_joined, hod_id,
-    department:departments ( id, name )
+    department:departments!profiles_department_id_fkey ( id, name )
   ),
   hod_verifier:profiles!training_submissions_hod_verified_by_fkey ( id, full_name ),
   hr_verifier:profiles!training_submissions_hr_verified_by_fkey ( id, full_name ),
@@ -64,7 +64,7 @@ export async function getSubmissionForMonth(
 ): Promise<SubmissionDetail | null> {
   const supabase = createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("training_submissions")
     .select(DETAIL_SELECT)
     .eq("employee_id", employeeId)
@@ -72,6 +72,12 @@ export async function getSubmissionForMonth(
     .eq("year", year)
     .maybeSingle()
     .returns<SubmissionDetail | null>();
+
+  if (error) {
+    throw new Error(
+      `Unable to load the monthly training record: ${error.message}`,
+    );
+  }
 
   if (data?.records) {
     data.records.sort((a, b) => a.seq_no - b.seq_no);
@@ -85,12 +91,16 @@ export async function getSubmissionById(
 ): Promise<SubmissionDetail | null> {
   const supabase = createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("training_submissions")
     .select(DETAIL_SELECT)
     .eq("id", id)
     .maybeSingle()
     .returns<SubmissionDetail | null>();
+
+  if (error) {
+    throw new Error(`Unable to load the training submission: ${error.message}`);
+  }
 
   if (data?.records) {
     data.records.sort((a, b) => a.seq_no - b.seq_no);
@@ -106,12 +116,16 @@ export async function listYearSubmissions(
 ): Promise<TrainingSubmission[]> {
   const supabase = createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("training_submissions")
     .select("*")
     .eq("employee_id", employeeId)
     .eq("year", year)
     .order("month");
+
+  if (error) {
+    throw new Error(`Unable to load yearly training records: ${error.message}`);
+  }
 
   return data ?? [];
 }
@@ -127,12 +141,18 @@ export async function listYearSubmissionsWithRecords(
 ): Promise<SubmissionDetail[]> {
   const supabase = createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("training_submissions")
     .select(DETAIL_SELECT)
     .eq("employee_id", employeeId)
     .eq("year", year)
     .order("month");
+
+  if (error) {
+    throw new Error(
+      `Unable to load the yearly training list: ${error.message}`,
+    );
+  }
 
   const rows = (data as unknown as SubmissionDetail[] | null) ?? [];
 
@@ -141,6 +161,38 @@ export async function listYearSubmissionsWithRecords(
   for (const row of rows) {
     row.records = [...(row.records ?? [])].sort(
       (a, b) => a.seq_no - b.seq_no || a.id - b.id,
+    );
+  }
+
+  return rows;
+}
+
+/** One year's detailed submissions for many employees in one HR query. */
+export async function listYearSubmissionsWithRecordsForEmployees(
+  employeeIds: number[],
+  year: number,
+): Promise<SubmissionDetail[]> {
+  if (employeeIds.length === 0) return [];
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("training_submissions")
+    .select(DETAIL_SELECT)
+    .in("employee_id", employeeIds)
+    .eq("year", year)
+    .order("month")
+    .returns<SubmissionDetail[]>();
+
+  if (error) {
+    throw new Error(
+      `Unable to load company training records: ${error.message}`,
+    );
+  }
+
+  const rows = data ?? [];
+  for (const row of rows) {
+    row.records = [...(row.records ?? [])].sort(
+      (left, right) => left.seq_no - right.seq_no || left.id - right.id,
     );
   }
 
@@ -169,6 +221,37 @@ export async function listYearSubmissionsForEmployees(
     .select("id, employee_id, month, status, total_minutes, is_nil_return")
     .in("employee_id", employeeIds)
     .eq("year", year);
+
+  return data ?? [];
+}
+
+export type EmployeeYearTrainingSummary = Pick<
+  TrainingSubmission,
+  "id" | "employee_id" | "month" | "status" | "total_minutes"
+> & {
+  records: { id: number }[];
+};
+
+/** Training counts and recorded time for an HR employee directory. */
+export async function listEmployeeYearTrainingSummaries(
+  employeeIds: number[],
+  year: number,
+): Promise<EmployeeYearTrainingSummary[]> {
+  if (employeeIds.length === 0) return [];
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("training_submissions")
+    .select(
+      "id, employee_id, month, status, total_minutes, records:training_records ( id )",
+    )
+    .in("employee_id", employeeIds)
+    .eq("year", year)
+    .returns<EmployeeYearTrainingSummary[]>();
+
+  if (error) {
+    throw new Error(`Unable to load employee training totals: ${error.message}`);
+  }
 
   return data ?? [];
 }

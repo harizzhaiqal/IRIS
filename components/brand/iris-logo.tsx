@@ -57,11 +57,15 @@ export function IrisMark({
   size = 80,
   ring = true,
   tone = "light",
+  animate = false,
   className,
 }: {
   size?: number;
   ring?: boolean;
   tone?: IrisTone;
+  /** Lights each blade in turn around the ring — the loading state. Honours
+   *  prefers-reduced-motion, falling back to the static mark. */
+  animate?: boolean;
   className?: string;
 }) {
   const t = TONES[tone];
@@ -75,9 +79,12 @@ export function IrisMark({
         className="absolute inset-0 isolate"
         style={{ WebkitMaskImage: HOLE, maskImage: HOLE }}
       >
-        {BLADES.map((angle) => (
+        {BLADES.map((angle, i) => (
           <span
             key={angle}
+            className={
+              animate ? "animate-iris-pulse motion-reduce:animate-none" : undefined
+            }
             style={{
               position: "absolute",
               top: "50%",
@@ -88,6 +95,8 @@ export function IrisMark({
               background: t.gradient,
               mixBlendMode: t.blend,
               transform: `translate(-50%,-50%) rotate(${angle}deg) translateX(38%)`,
+              // Six blades, one period: the highlight travels a full turn.
+              animationDelay: animate ? `${i * 0.11}s` : undefined,
             }}
           />
         ))}

@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Eye, EyeOff, Loader2, LogIn, Mail } from "lucide-react";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,8 @@ export function LoginForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
+
+  useGlobalPending(isSubmitting, "Signing you in…");
 
   async function onSubmit(values: LoginInput) {
     setFormError(null);

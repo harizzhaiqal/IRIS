@@ -2,16 +2,15 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ClipboardCheck,
-  ClipboardList,
   Inbox,
   Users,
 } from "lucide-react";
 
 import { InsightCard } from "@/components/dashboard/insight-card";
+import { CommissionDashboardSummary } from "@/components/dashboard/commission-dashboard-summary";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { TargetProgress } from "@/components/training/target-progress";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -176,12 +175,6 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
           </p>
         </div>
 
-        <Button asChild>
-          <Link href="/training/submissions">
-            <ClipboardList className="h-4 w-4" />
-            All submissions
-          </Link>
-        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -213,6 +206,8 @@ export async function HrDashboard({ profile }: { profile: Profile }) {
           tone={priorityActions > 0 ? "destructive" : "success"}
         />
       </div>
+
+      <CommissionDashboardSummary />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

@@ -8,6 +8,7 @@ import {
   Inbox,
   LayoutDashboard,
   NotebookPen,
+  ReceiptText,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -38,6 +39,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["staff", "hod", "hr_admin", "ceo"],
   },
   {
+    href: "/training/team",
+    label: "Training submissions",
+    icon: Users,
+    roles: ["hod"],
+  },
+  {
     href: "/training",
     label: "My training",
     icon: NotebookPen,
@@ -50,12 +57,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["hr_admin", "ceo"],
   },
   {
-    href: "/training/team",
-    label: "Team submissions",
-    icon: Users,
-    roles: ["hod"],
-  },
-  {
     href: "/requests",
     label: "Requests",
     icon: Inbox,
@@ -63,9 +64,15 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/requests",
-    label: "Request records",
+    label: "Requests",
     icon: ClipboardCheck,
     roles: ["hr_admin", "ceo"],
+  },
+  {
+    href: "/commission",
+    label: "Commission",
+    icon: ReceiptText,
+    roles: ["staff", "hod", "hr_admin", "ceo"],
   },
   {
     href: "/reminders",

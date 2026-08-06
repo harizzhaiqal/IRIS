@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Space_Grotesk } from "next/font/google";
 
+import { LoadingProvider } from "@/components/app-shell/loading-overlay";
+
 import "./globals.css";
 
 /* The IRIS logo is set in Space Grotesk per the brand sheet. It is loaded only
@@ -38,7 +40,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} antialiased`}
       >
-        {children}
+        <LoadingProvider>{children}</LoadingProvider>
       </body>
     </html>
   );

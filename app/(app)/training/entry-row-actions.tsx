@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,16 +22,19 @@ export function EntryRowActions({
   title,
   month,
   year,
+  afterDeleteHref,
 }: {
   recordId: number;
   title: string;
   month: number;
   year: number;
+  afterDeleteHref?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useGlobalPending(pending, "Deleting entry…");
 
   function runDelete() {
     setError(null);
@@ -44,7 +48,11 @@ export function EntryRowActions({
       }
 
       setOpen(false);
-      router.refresh();
+      if (afterDeleteHref) {
+        router.replace(afterDeleteHref);
+      } else {
+        router.refresh();
+      }
     });
   }
 

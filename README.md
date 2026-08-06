@@ -2,7 +2,7 @@
 
 Internal staff workflow system for IRS Software Solution. This build covers the
 authentication shell, the role-aware dashboard, the **Employee Training Records**
-module, and a prototype **Request Management** module.
+module, and prototype **Request Management** and **Commission Records** modules.
 
 The module replaces form IRS-HR-F14 (*Employee Training Record & Evaluation*),
 which was previously an Excel workbook per employee per year, emailed to a head
@@ -402,10 +402,10 @@ the scheduled reminder worker; it never reaches the browser.
 
 ## Out of scope
 
-The Commission module, reports, general-purpose exports, and the automation log
-page are deliberately not built. Request suggestions remain a deterministic
-prototype rather than a model call. `automation_logs` is populated and ready for
-a viewer to be added later.
+Attendance, leave, payroll, payslips, employee master data, reports,
+general-purpose exports, and a standalone automation log page are deliberately
+not built. Request and commission suggestions remain deterministic prototypes
+rather than model calls.
 
 See [DECISIONS.md](DECISIONS.md) for the ambiguities resolved during the build
 and the reasoning behind each choice.

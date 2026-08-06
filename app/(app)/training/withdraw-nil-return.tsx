@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Undo2 } from "lucide-react";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { withdrawNilReturn } from "./actions";
 
@@ -17,6 +18,7 @@ export function WithdrawNilReturn({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  useGlobalPending(pending, "Withdrawing nil return…");
 
   function run() {
     setError(null);

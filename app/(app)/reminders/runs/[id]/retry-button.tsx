@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Loader2, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { retryFailedDeliveries } from "../../actions";
 
@@ -11,6 +12,7 @@ export function RetryButton({ runId }: { runId: number }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  useGlobalPending(pending, "Retrying deliveries…");
 
   function retry() {
     setMessage(null);

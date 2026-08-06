@@ -15,7 +15,6 @@ import {
 import { EmptyState } from "@/components/training/empty-state";
 import { StatusBadge } from "@/components/training/status-badge";
 import { TargetProgress } from "@/components/training/target-progress";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -150,12 +149,6 @@ export async function HodDashboard({ profile }: { profile: Profile }) {
           </p>
         </div>
 
-        <Button asChild>
-          <Link href="/training/team">
-            <ClipboardCheck className="h-4 w-4" />
-            Review team submissions
-          </Link>
-        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -23,6 +23,11 @@ function failed(error: string): { ok: false; error: string } {
   return { ok: false, error };
 }
 
+function revalidateTrainingPages() {
+  revalidatePath("/training");
+  revalidatePath("/training/new");
+}
+
 /**
  * The employee's row for a month, creating the draft on first use. Returns null
  * if the month exists but is closed to editing.
@@ -164,7 +169,7 @@ export async function saveTrainingEntry(
       performedBy: profile.id,
     });
 
-    revalidatePath("/training");
+    revalidateTrainingPages();
     return { ok: true, data: { recordId: entry.recordId } };
   }
 
@@ -196,7 +201,7 @@ export async function saveTrainingEntry(
     performedBy: profile.id,
   });
 
-  revalidatePath("/training");
+  revalidateTrainingPages();
   return { ok: true, data: { recordId: created.id } };
 }
 
@@ -223,7 +228,7 @@ export async function deleteTrainingEntry(
     performedBy: profile.id,
   });
 
-  revalidatePath("/training");
+  revalidateTrainingPages();
   return { ok: true };
 }
 
@@ -258,7 +263,7 @@ export async function attachFile(input: unknown): Promise<ActionResult> {
     performedBy: profile.id,
   });
 
-  revalidatePath("/training");
+  revalidateTrainingPages();
   return { ok: true };
 }
 
@@ -295,7 +300,7 @@ export async function removeAttachment(
     performedBy: profile.id,
   });
 
-  revalidatePath("/training");
+  revalidateTrainingPages();
   return { ok: true };
 }
 
@@ -310,7 +315,7 @@ export async function submitMonth(input: unknown): Promise<ActionResult> {
 
   const { data: submission } = await supabase
     .from("training_submissions")
-    .select("id, status, is_nil_return, total_minutes")
+    .select("id, status, total_minutes")
     .eq("employee_id", profile.id)
     .eq("month", month)
     .eq("year", year)
@@ -329,10 +334,8 @@ export async function submitMonth(input: unknown): Promise<ActionResult> {
     .select("id", { count: "exact", head: true })
     .eq("submission_id", submission.id);
 
-  if (!submission.is_nil_return && (count ?? 0) === 0) {
-    return failed(
-      "Add at least one training entry, or declare a nil return for this month.",
-    );
+  if ((count ?? 0) === 0) {
+    return failed("Add at least one training entry before submitting this month.");
   }
 
   const targets = await getTargets();
@@ -362,7 +365,7 @@ export async function submitMonth(input: unknown): Promise<ActionResult> {
     performedBy: profile.id,
   });
 
-  revalidatePath("/training");
+  revalidateTrainingPages();
   revalidatePath("/dashboard");
   return { ok: true };
 }
@@ -411,62 +414,6 @@ export async function withdrawNilReturn(input: unknown): Promise<ActionResult> {
     performedBy: profile.id,
   });
 
-  revalidatePath("/training");
-  return { ok: true };
-}
-
-export async function declareNilReturn(input: unknown): Promise<ActionResult> {
-  const profile = await requireProfile();
-
-  const parsed = periodSchema.safeParse(input);
-  if (!parsed.success) return failed("Choose a valid month.");
-
-  const { month, year } = parsed.data;
-  const supabase = createClient();
-
-  const opened = await openSubmissionForEditing(profile.id, month, year);
-  if ("error" in opened) return failed(opened.error);
-
-  const { count } = await supabase
-    .from("training_records")
-    .select("id", { count: "exact", head: true })
-    .eq("submission_id", opened.id);
-
-  if ((count ?? 0) > 0) {
-    return failed(
-      "This month already has training entries. Remove them before declaring a nil return.",
-    );
-  }
-
-  const targets = await getTargets();
-  const submittedAt = new Date();
-
-  const { error } = await supabase
-    .from("training_submissions")
-    .update({
-      is_nil_return: true,
-      status: "submitted_pending_hod",
-      submitted_at: submittedAt.toISOString(),
-      is_late: isLateSubmission(
-        submittedAt,
-        month,
-        year,
-        targets.submissionDeadlineDay,
-      ),
-    })
-    .eq("id", opened.id);
-
-  if (error) return failed("Could not record a nil return for this month.");
-
-  await logAction({
-    actionType: "submission.nil_return",
-    description: `${profile.full_name} declared no training for ${monthName(month)} ${year}`,
-    relatedTable: "training_submissions",
-    relatedId: opened.id,
-    performedBy: profile.id,
-  });
-
-  revalidatePath("/training");
-  revalidatePath("/dashboard");
+  revalidateTrainingPages();
   return { ok: true };
 }

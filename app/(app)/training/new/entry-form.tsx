@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { Loader2, Paperclip, Upload, X } from "lucide-react";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase/client";
 import { EFFECTIVENESS_LABELS, type Effectiveness } from "@/lib/types";
 import { calculateMinutes, hhmmToMinutes, minutesToHHMM } from "@/lib/utils/duration";
-import { monthName } from "@/lib/utils/targets";
 import {
   trainingEntryFormSchema,
   type TrainingEntryFormValues,
@@ -24,7 +24,6 @@ import {
   attachFile,
   removeAttachment,
   saveTrainingEntry,
-  submitMonth,
 } from "../actions";
 
 export type ExistingAttachment = {
@@ -53,6 +52,18 @@ const EFFECTIVENESS_OPTIONS: Effectiveness[] = [
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
+const EMPTY_FORM_VALUES: TrainingEntryFormValues = {
+  title: "",
+  startDatetime: "",
+  endDatetime: "",
+  hours: "",
+  overrideReason: "",
+  location: "",
+  trainerProvider: "",
+  effectiveness: undefined,
+  remarks: "",
+};
+
 export function EntryForm({
   month,
   year,
@@ -72,6 +83,7 @@ export function EntryForm({
   const [files, setFiles] = useState<File[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  useGlobalPending(isBusy, "Saving training entry…");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Tracks whether the employee has typed their own figure, so the calculated
@@ -83,6 +95,7 @@ export function EntryForm({
     handleSubmit,
     watch,
     setValue,
+    reset,
 
     control,
     formState: { errors },
@@ -178,7 +191,7 @@ export function EntryForm({
     return { error: null };
   }
 
-  function submitAndClose(values: TrainingEntryFormValues) {
+  function saveEntry(values: TrainingEntryFormValues) {
     setFormError(null);
     setIsBusy(true);
 
@@ -188,36 +201,16 @@ export function EntryForm({
         setFormError(error);
         return;
       }
-      router.push(`/training?month=${month}&year=${year}`);
-      router.refresh();
-    });
-  }
 
-  /**
-   * Saves the entry, then sends the whole month to the HOD. The two steps are
-   * reported separately: if the month cannot be submitted the entry is still
-   * saved, and saying so stops the employee retyping it.
-   */
-  function saveAndSubmit(values: TrainingEntryFormValues) {
-    setFormError(null);
-    setIsBusy(true);
-
-    void persist(values).then(async ({ error }) => {
-      if (error) {
-        setIsBusy(false);
-        setFormError(error);
+      if (isEditing) {
+        router.replace(`/training/new?month=${month}&year=${year}`);
         return;
       }
 
-      const submitted = await submitMonth({ month, year });
-      setIsBusy(false);
-
-      if (!submitted.ok) {
-        setFormError(`Entry saved, but the month was not submitted. ${submitted.error}`);
-        return;
-      }
-
-      router.push(`/training?month=${month}&year=${year}`);
+      reset(EMPTY_FORM_VALUES);
+      hoursTouched.current = false;
+      setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       router.refresh();
     });
   }
@@ -235,7 +228,11 @@ export function EntryForm({
   }
 
   return (
-    <form className="space-y-6" noValidate>
+    <form
+      className="space-y-6"
+      onSubmit={handleSubmit(saveEntry)}
+      noValidate
+    >
       <Card>
         <CardContent className="space-y-5 pt-6">
           <div className="space-y-2">
@@ -461,36 +458,29 @@ export function EntryForm({
       ) : null}
 
       <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleSubmit(submitAndClose)}
-            disabled={isBusy}
-          >
-            {isBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save as draft
-          </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {isEditing ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() =>
+                router.push(`/training/new?month=${month}&year=${year}`)
+              }
+              disabled={isBusy}
+            >
+              Cancel edit
+            </Button>
+          ) : null}
 
-          <Button type="button" onClick={handleSubmit(saveAndSubmit)} disabled={isBusy}>
+          <Button type="submit" className="min-w-28" disabled={isBusy}>
             {isBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Submit
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => router.push(`/training?month=${month}&year=${year}`)}
-            disabled={isBusy}
-          >
-            Cancel
+            Save
           </Button>
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          Save as draft keeps {monthName(month)} {year} editable. Submit sends the whole month
-          to your HOD for verification, and it cannot be edited again unless it is
-          returned to you.
+        <p className="text-right text-sm text-muted-foreground">
+          Save adds this entry to the selected month. Submit the complete month
+          from the training list above when every entry is ready.
         </p>
       </div>
     </form>

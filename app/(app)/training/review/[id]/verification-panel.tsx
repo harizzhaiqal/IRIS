@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, ThumbsUp, Undo2, X } from "lucide-react";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +31,7 @@ export function VerificationPanel({
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [activeDecision, setActiveDecision] = useState<Decision | null>(null);
+  useGlobalPending(pending, "Recording decision…");
 
   // A reviewer never acts on their own month, whatever their role.
   const canVerifyAsHod =

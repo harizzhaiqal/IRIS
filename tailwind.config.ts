@@ -71,10 +71,18 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        /* One blade of the IRIS mark lighting and fading. The six blades share
+           this keyframe and are offset by animation-delay, so the highlight
+           travels around the ring. */
+        "iris-pulse": {
+          "0%, 70%, 100%": { opacity: "0.28" },
+          "25%": { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "iris-pulse": "iris-pulse 1.35s ease-in-out infinite",
       },
     },
   },

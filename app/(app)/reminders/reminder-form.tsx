@@ -7,6 +7,7 @@ import { Controller, useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -84,6 +85,8 @@ export function ReminderForm({
   const router = useRouter();
   const [isSaving, startSaving] = useTransition();
   const [isTesting, startTesting] = useTransition();
+  useGlobalPending(isSaving, "Saving reminder…");
+  useGlobalPending(isTesting, "Sending test…");
   const [message, setMessage] = useState<
     { type: "success" | "error"; text: string } | null
   >(null);

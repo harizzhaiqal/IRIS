@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ThumbsUp } from "lucide-react";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { StatusBadge } from "@/components/training/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +39,7 @@ export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+  useGlobalPending(pending, "Approving submissions…");
 
   // Only submissions already past the HOD stage can be approved in bulk.
   const selectableIds = useMemo(

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Profile } from "@/lib/types";
+import type { Profile, UserRole } from "@/lib/types";
 
 export type ProfileSummary = {
   id: number;
@@ -9,10 +9,11 @@ export type ProfileSummary = {
   date_joined: string | null;
   department_id: number | null;
   hod_id: number | null;
+  role: UserRole;
 };
 
 const SUMMARY_COLUMNS =
-  "id, full_name, email, designation, date_joined, department_id, hod_id";
+  "id, full_name, email, designation, date_joined, department_id, hod_id, role";
 
 export async function getProfileById(id: number): Promise<Profile | null> {
   const supabase = createClient();

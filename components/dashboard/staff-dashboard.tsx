@@ -101,22 +101,13 @@ export async function StaffDashboard({ profile }: { profile: Profile }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome back, {profile.full_name.split(" ")[0]}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Your training progress and request updates for {monthName(month)} {year}.
-          </p>
-        </div>
-
-        <Button asChild>
-          <Link href={`/training/new?month=${month}&year=${year}`}>
-            <Plus className="h-4 w-4" />
-            Add training
-          </Link>
-        </Button>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Welcome back, {profile.full_name.split(" ")[0]}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Your training progress and request updates for {monthName(month)} {year}.
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -282,14 +273,6 @@ export async function StaffDashboard({ profile }: { profile: Profile }) {
                 icon={Clock}
                 title="Nothing submitted yet this year"
                 description="Record your first training entry and submit the month to start building your record."
-                action={
-                  <Button size="sm" asChild>
-                    <Link href={`/training/new?month=${month}&year=${year}`}>
-                      <Plus className="h-4 w-4" />
-                      Add training
-                    </Link>
-                  </Button>
-                }
               />
             ) : (
               <ul className="divide-y">

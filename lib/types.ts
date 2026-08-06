@@ -22,6 +22,61 @@ export type ReminderSchedule = Tables<"reminder_schedules">;
 export type ReminderRun = Tables<"reminder_runs">;
 export type ReminderDelivery = Tables<"reminder_deliveries">;
 
+// ---------------------------------------------------------------------------
+// Commission Records prototype
+// ---------------------------------------------------------------------------
+
+export type CommissionStatus =
+  | "PDF Uploaded"
+  | "Email Sent"
+  | "Viewed"
+  | "Not Viewed"
+  | "Acknowledged";
+
+export type CommissionRecord = {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  department: string;
+  commissionMonth: number;
+  commissionYear: number;
+  pdfFileName: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  emailSentAt?: string;
+  viewedAt?: string;
+  acknowledgedAt?: string;
+  status: CommissionStatus;
+  reminderCount: number;
+  lastReminderSentAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CommissionViewLog = {
+  id: number;
+  commissionRecordId: number;
+  employeeId: number;
+  viewedAt: string;
+  action: string;
+};
+
+export type CommissionActivityAction =
+  | "Commission PDF uploaded"
+  | "Commission email marked sent"
+  | "Commission PDF viewed"
+  | "Commission acknowledged"
+  | "Commission reminder sent";
+
+export type CommissionActivityLog = {
+  id: number;
+  commissionRecordId: number;
+  action: CommissionActivityAction;
+  description: string;
+  performedBy: string;
+  createdAt: string;
+};
+
 /** The statuses in which an employee may still edit their month. */
 export const EDITABLE_STATUSES: SubmissionStatus[] = [
   "draft",

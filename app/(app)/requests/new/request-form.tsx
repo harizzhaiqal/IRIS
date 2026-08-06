@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { Loader2, Paperclip, Sparkles, Upload, X } from "lucide-react";
 
+import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,6 +44,7 @@ export function RequestForm({ userId }: { userId: number }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  useGlobalPending(isBusy, "Submitting request…");
   const [suggestion, setSuggestion] = useState<RequestSuggestion | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

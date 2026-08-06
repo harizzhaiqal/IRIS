@@ -1,253 +1,119 @@
-import Link from "next/link";
-import { Users } from "lucide-react";
-
-import { EmptyState } from "@/components/training/empty-state";
-import { StatusBadge } from "@/components/training/status-badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
+import { listDepartments } from "@/lib/queries/departments";
 import { listTeamMembers } from "@/lib/queries/profiles";
-import { getTargets } from "@/lib/queries/settings";
-import { listTeamSubmissionsForMonth } from "@/lib/queries/submissions";
-import { minutesToHHMM } from "@/lib/utils/duration";
-import { isOverdue, monthName } from "@/lib/utils/targets";
-import { MonthPicker } from "../month-picker";
+import { listEmployeeYearTrainingSummaries } from "@/lib/queries/submissions";
+import { filesOwnRecords } from "@/lib/types";
+import {
+  StaffTrainingDirectory,
+  type StaffTrainingDirectoryRow,
+} from "../submissions/staff-training-directory";
 
-export const metadata = { title: "Team submissions — IRIS" };
+export const metadata = { title: "Training submissions — IRIS" };
 
-export default async function TeamPage({
+function resolveYear(value?: string) {
+  const requested = Number(value);
+  return Number.isInteger(requested) && requested >= 2000 && requested <= 2100
+    ? requested
+    : new Date().getFullYear();
+}
+
+export default async function TeamTrainingPage({
   searchParams,
 }: {
-  searchParams: { month?: string; year?: string };
+  searchParams: { year?: string };
 }) {
   const profile = await requireRole(["hod"]);
   const now = new Date();
-
-  const monthParam = Number(searchParams.month);
-  const yearParam = Number(searchParams.year);
-  const month = monthParam >= 1 && monthParam <= 12 ? monthParam : now.getMonth() + 1;
-  const year = yearParam >= 2000 && yearParam <= 2100 ? yearParam : now.getFullYear();
-
-  const [targets, team] = await Promise.all([
-    getTargets(),
+  const month = now.getMonth() + 1;
+  const year = resolveYear(searchParams.year);
+  const [allTeamMembers, departments] = await Promise.all([
     listTeamMembers(profile.id),
+    listDepartments(),
   ]);
-
-  const submissions = await listTeamSubmissionsForMonth(
+  const team = allTeamMembers.filter((member) =>
+    filesOwnRecords(member.role),
+  );
+  const summaries = await listEmployeeYearTrainingSummaries(
     team.map((member) => member.id),
-    month,
     year,
   );
-
-  const byEmployee = new Map(submissions.map((row) => [row.employee_id, row]));
-
-  const rows = team.map((member) => ({
-    member,
-    submission: byEmployee.get(member.id) ?? null,
-  }));
-
-  const submittedCount = rows.filter(
-    (row) => row.submission && row.submission.status !== "draft",
-  ).length;
-  const awaitingMe = rows.filter(
-    (row) => row.submission?.status === "submitted_pending_hod",
-  ).length;
-  const notSubmitted = rows.filter(
-    (row) => !row.submission || row.submission.status === "draft",
+  const departmentNames = new Map(
+    departments.map((department) => [department.id, department.name]),
   );
+  const totals = new Map<number, { trainingCount: number; minutes: number }>();
 
+  for (const summary of summaries) {
+    const current = totals.get(summary.employee_id) ?? {
+      trainingCount: 0,
+      minutes: 0,
+    };
+    current.trainingCount += summary.records?.length ?? 0;
+    current.minutes += summary.total_minutes;
+    totals.set(summary.employee_id, current);
+  }
+
+  const rows: StaffTrainingDirectoryRow[] = team.map((member) => {
+    const employeeTotals = totals.get(member.id) ?? {
+      trainingCount: 0,
+      minutes: 0,
+    };
+    const nextVerification = summaries
+      .filter(
+        (summary) =>
+          summary.employee_id === member.id &&
+          summary.status === "submitted_pending_hod",
+      )
+      .sort((left, right) => left.month - right.month)[0];
+
+    return {
+      id: member.id,
+      fullName: member.full_name,
+      email: member.email,
+      designation: member.designation,
+      departmentId: member.department_id,
+      departmentName: member.department_id
+        ? departmentNames.get(member.department_id) ?? null
+        : null,
+      trainingCount: employeeTotals.trainingCount,
+      totalMinutes: employeeTotals.minutes,
+      verifyHref: nextVerification
+        ? `/training/review/${nextVerification.id}`
+        : null,
+      detailHref: `/training/staff/${member.id}?month=${month}&year=${year}`,
+      exportHref: `/training/export?employeeId=${member.id}&year=${year}`,
+    };
+  });
+  const teamDepartmentIds = new Set(
+    team
+      .map((member) => member.department_id)
+      .filter((id): id is number => id !== null),
+  );
+  const teamDepartments = departments.filter((department) =>
+    teamDepartmentIds.has(department.id),
+  );
   const currentYear = now.getFullYear();
-  const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+  const years = Array.from(
+    new Set([year, currentYear - 2, currentYear - 1, currentYear, currentYear + 1]),
+  ).sort((left, right) => right - left);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Team submissions
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {monthName(month)} {year}
-          </p>
-        </div>
-
-        <MonthPicker
-          month={month}
-          year={year}
-          years={years}
-          basePath="/training/team"
-        />
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Training submissions
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Review team training, view yearly records, and download reports.
+        </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Submitted
-            </p>
-            <p className="text-2xl font-semibold tabular-nums">
-              {submittedCount}
-              <span className="text-base font-normal text-muted-foreground">
-                {" / "}
-                {team.length}
-              </span>
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Awaiting my verification
-            </p>
-            <p className="text-2xl font-semibold tabular-nums">{awaitingMe}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Not yet submitted
-            </p>
-            <p className="text-2xl font-semibold tabular-nums">
-              {notSubmitted.length}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {monthName(month)} {year}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {team.length === 0 ? (
-            <EmptyState
-              icon={Users}
-              title="No one reports to you yet"
-              description="Once HR assigns team members to you, their monthly submissions appear here for verification."
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Hours</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead className="text-right">Review</TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {rows.map(({ member, submission }) => {
-                  const overdue = isOverdue(
-                    submission?.status ?? null,
-                    month,
-                    year,
-                    targets.submissionDeadlineDay,
-                    now,
-                  );
-
-                  return (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <p className="font-medium">{member.full_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {member.designation ?? "—"}
-                        </p>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <StatusBadge
-                            status={submission?.status ?? null}
-                            isLate={submission?.is_late ?? false}
-                          />
-                          {overdue ? (
-                            <span className="text-xs font-medium text-destructive">
-                              Overdue
-                            </span>
-                          ) : null}
-                          {submission?.is_nil_return ? (
-                            <span className="text-xs text-muted-foreground">
-                              Nil return
-                            </span>
-                          ) : null}
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="text-right tabular-nums">
-                        {submission ? minutesToHHMM(submission.total_minutes) : "—"}
-                      </TableCell>
-
-                      <TableCell className="text-sm text-muted-foreground">
-                        {submission?.submitted_at
-                          ? new Date(submission.submitted_at).toLocaleDateString(
-                              undefined,
-                              { dateStyle: "medium" },
-                            )
-                          : "—"}
-                      </TableCell>
-
-                      <TableCell className="text-right">
-                        {submission && submission.status !== "draft" ? (
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/training/review/${submission.id}`}>
-                              {submission.status === "submitted_pending_hod"
-                                ? "Verify"
-                                : "View"}
-                            </Link>
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            Nothing to review
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {notSubmitted.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Still waiting on</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-wrap gap-2">
-              {notSubmitted.map(({ member }) => (
-                <li
-                  key={member.id}
-                  className="rounded-full border px-3 py-1 text-sm"
-                >
-                  {member.full_name}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      ) : null}
+      <StaffTrainingDirectory
+        rows={rows}
+        departments={teamDepartments}
+        year={year}
+        years={years}
+        showVerifyAction
+      />
     </div>
   );
 }
