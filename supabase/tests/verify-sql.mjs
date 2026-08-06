@@ -127,7 +127,10 @@ await db.exec(`
     select 'salt';
   $$;
 
-  create table storage.buckets (id text primary key, name text, public boolean);
+  create table storage.buckets (
+    id text primary key, name text, public boolean,
+    file_size_limit bigint, allowed_mime_types text[]
+  );
   create table storage.objects (
     id uuid primary key default gen_random_uuid(),
     bucket_id text, name text, owner uuid
@@ -142,6 +145,7 @@ await db.exec(`
   create role service_role;
   alter role service_role bypassrls;
   grant usage on schema public, storage to anon, authenticated, service_role;
+  grant select, insert, delete on storage.objects to authenticated;
 `);
 console.log("  stubs installed");
 
@@ -182,6 +186,34 @@ await db.exec(
 );
 console.log("  applied without error");
 
+console.log("\n=== Migration 6: AI media library ===");
+const aiMediaMigration = stripExtensions(
+  read("supabase/migrations/20260806000000_ai_media_library.sql"),
+);
+await db.exec(aiMediaMigration);
+console.log("  applied without error");
+
+try {
+  await db.exec(aiMediaMigration);
+  check("the AI media migration can be applied twice", true);
+} catch (error) {
+  check("the AI media migration can be applied twice", false, error.message);
+}
+
+console.log("\n=== Migration 7: AI media upload limits ===");
+const aiMediaLimitsMigration = stripExtensions(
+  read("supabase/migrations/20260806010000_ai_media_upload_limits.sql"),
+);
+await db.exec(aiMediaLimitsMigration);
+console.log("  applied without error");
+
+try {
+  await db.exec(aiMediaLimitsMigration);
+  check("the AI media upload limits migration can be applied twice", true);
+} catch (error) {
+  check("the AI media upload limits migration can be applied twice", false, error.message);
+}
+
 // RLS is bypassed for the table owner, so force it for the test.
 //
 // Deliberately no GRANT here: the migration is expected to issue its own. It
@@ -198,6 +230,9 @@ await db.exec(`
   alter table public.reminder_schedules force row level security;
   alter table public.reminder_runs force row level security;
   alter table public.reminder_deliveries force row level security;
+  alter table public.ai_media_assets force row level security;
+  alter table storage.objects enable row level security;
+  alter table storage.objects force row level security;
 `);
 
 // Assert the migration granted table access, rather than assuming it.
@@ -301,6 +336,85 @@ const uid = {};
       ),
     "non-DEFAULT value",
   );
+}
+
+console.log("\n=== AI media library: metadata and storage access ===");
+{
+  const { rows: buckets } = await db.query(
+    `select id, public, file_size_limit, allowed_mime_types
+       from storage.buckets where id = 'AI videos'`,
+  );
+  check(
+    "the AI videos bucket exists and is private",
+    buckets.length === 1 && buckets[0].public === false,
+  );
+  check(
+    "the AI videos bucket accepts only the supported formats",
+    JSON.stringify(buckets[0]?.allowed_mime_types) ===
+      JSON.stringify(["video/mp4", "video/webm", "video/quicktime"]),
+    JSON.stringify(buckets[0]?.allowed_mime_types),
+  );
+  check(
+    "the AI videos bucket is limited to 50 MB",
+    Number(buckets[0]?.file_size_limit) === 52428800,
+    String(buckets[0]?.file_size_limit),
+  );
+
+  let assetId;
+  await asUser(AUTH_UID.staffRnd, async () => {
+    const { rows } = await db.query(
+      `insert into public.ai_media_assets (
+         uploader_id, title, category, description, ai_tags,
+         file_name, storage_path, mime_type, file_size_bytes
+       ) values ($1, 'Stored demo', 'Marketing', 'A real stored asset',
+         array['AI', 'Demo'], 'stored-demo.mp4', $2, 'video/mp4', 2048)
+       returning id`,
+      [uid.staffRnd, `${uid.staffRnd}/stored-demo.mp4`],
+    );
+    assetId = rows[0]?.id;
+    check("staff can add metadata for their own upload", Number.isInteger(assetId));
+
+    const forged = await db
+      .query(
+        `insert into public.ai_media_assets (
+           uploader_id, title, category, file_name, storage_path,
+           mime_type, file_size_bytes
+         ) values ($1, 'Forged owner', 'Internal', 'forged.mp4', $2,
+           'video/mp4', 100) returning id`,
+        [uid.staffSupport, `${uid.staffSupport}/forged.mp4`],
+      )
+      .catch(() => ({ rows: [] }));
+    check("staff cannot register a video for another owner", forged.rows.length === 0);
+
+    const ownObject = await db.query(
+      `insert into storage.objects (bucket_id, name)
+       values ('AI videos', $1) returning id`,
+      [`${uid.staffRnd}/stored-demo.mp4`],
+    );
+    check("staff can upload into their own storage folder", ownObject.rows.length === 1);
+
+    const otherObject = await db
+      .query(
+        `insert into storage.objects (bucket_id, name)
+         values ('AI videos', $1) returning id`,
+        [`${uid.staffSupport}/not-mine.mp4`],
+      )
+      .catch(() => ({ rows: [] }));
+    check("staff cannot upload into another storage folder", otherObject.rows.length === 0);
+  });
+
+  await asUser(AUTH_UID.staffSupport, async () => {
+    const { rows: visibleAssets } = await db.query(
+      `select id from public.ai_media_assets where id = $1`,
+      [assetId],
+    );
+    check("all staff can list stored AI media", visibleAssets.length === 1);
+
+    const { rows: visibleObjects } = await db.query(
+      `select id from storage.objects where bucket_id = 'AI videos'`,
+    );
+    check("all staff can read stored AI videos", visibleObjects.length === 1);
+  });
 }
 
 console.log("\n=== Reminders: defaults, security and claiming ===");

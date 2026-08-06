@@ -11,6 +11,8 @@ const SOURCES = [
   "supabase/migrations/20260730120000_requests.sql",
   "supabase/migrations/20260804000000_create_user.sql",
   "supabase/migrations/20260804120000_reminders.sql",
+  "supabase/migrations/20260806000000_ai_media_library.sql",
+  "supabase/migrations/20260806010000_ai_media_upload_limits.sql",
   "supabase/seed.sql",
 ];
 

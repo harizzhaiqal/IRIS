@@ -45,6 +45,7 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   "commission.pdf_viewed": "Commission PDF viewed",
   "commission.acknowledged": "Commission acknowledged",
   "commission.reminder_sent": "Commission reminder sent",
+  "ai_media.uploaded": "Media Library video uploaded",
 };
 
 export function activityLabel(actionType: string): string {

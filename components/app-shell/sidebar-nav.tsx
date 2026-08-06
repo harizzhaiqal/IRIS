@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   Inbox,
   LayoutDashboard,
+  LibraryBig,
   NotebookPen,
   ReceiptText,
   Users,
@@ -72,6 +73,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/commission",
     label: "Commission",
     icon: ReceiptText,
+    roles: ["staff", "hod", "hr_admin", "ceo"],
+  },
+  {
+    href: "/ai-media",
+    label: "Media Library",
+    icon: LibraryBig,
     roles: ["staff", "hod", "hr_admin", "ceo"],
   },
   {

@@ -1,7 +1,6 @@
 import Image from "next/image";
 
 import { Honeycomb } from "@/components/brand/honeycomb";
-import { IrisLogo } from "@/components/brand/iris-logo";
 
 import { LoginForm } from "./login-form";
 
@@ -27,11 +26,17 @@ export default function LoginPage({
         <Honeycomb />
 
         {/* Dropped clear of the panel edge so the mark has room to breathe.
-            The band on small screens is only ~94px tall, so it takes the small
-            lockup rather than a shrunken large one. */}
+            Rasterised from the CSS lockup at 4x, so one image serves the 32px
+            mobile band and the 128px desktop panel. */}
         <div className="relative lg:pt-10">
-          <IrisLogo size="sm" tone="dark" className="lg:hidden" />
-          <IrisLogo size="xl" tone="dark" className="hidden lg:inline-flex" />
+          <Image
+            src="/iris-lockup.png"
+            alt="IRIS"
+            width={1265}
+            height={512}
+            priority
+            className="h-8 w-auto lg:h-32"
+          />
         </div>
 
         <div className="relative mt-8 hidden lg:mt-0 lg:block">

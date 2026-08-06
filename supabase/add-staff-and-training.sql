@@ -1,156 +1,60 @@
 -- ===========================================================================
--- IRIS — add the 12-person staff roster, and give each of them a training
--- history for January to August 2026.
+-- IRIS — give the 12-person staff roster a training history for January to
+-- August 2026.
 --
--- Paste the whole file into the Supabase SQL Editor and press Run.
+-- CREATE THE PEOPLE FIRST, then paste this file into the SQL Editor:
 --
--- Two sections, and they must run in this order:
---   1. the people      — creates the auth account, provider link and profile row
---                        directly, so this file does not depend on helper RPCs
---   2. their training  — one submission per month they opened, with entries
+--   npm run user:roster
 --
--- SAFE TO RE-RUN. Section 1 skips anyone already present rather than failing on
--- a duplicate. Section 2 clears January–August 2026 for these twelve people
--- before regenerating it, so the file is the single source of that data — if
--- you have entered training for them by hand in that window, running this again
--- WILL REPLACE IT. Nobody else's records are touched, and no other month is.
+-- Accounts cannot be created from SQL. auth.users belongs to Supabase Auth,
+-- and on current projects it is owned by supabase_auth_admin — the SQL Editor
+-- runs as postgres, which no longer has rights over it, so an INSERT there
+-- fails with "must be owner of table users". scripts/create-user.mjs goes
+-- through the GoTrue Admin API with the service-role key instead, which is the
+-- supported route and also writes the auth.identities row that email sign-in
+-- resolves through.
 --
--- Every account signs in with the password Password123!
+-- Everything below is the public schema only, which the SQL Editor can write
+-- freely. It stops with a clear message if anyone is missing.
 --
--- One placeholder to correct: date_joined was not supplied, so it is set to
--- 2026-01-01 for everyone, which is the earliest month with training against
--- it. Edit the roster below if you have the real dates.
+-- SAFE TO RE-RUN. It clears January–August 2026 for these twelve people before
+-- regenerating, so this file is the single source of that data — if you have
+-- entered training for them by hand in that window, running this again WILL
+-- REPLACE IT. Nobody else's records are touched, and no other month is.
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
--- 1. The people
+-- 0. Check the people exist
 --
--- Department names are matched case-insensitively against public.departments,
--- so 'r&D' and 'support engineer' resolve as written. Each person's reporting
--- line is filled in automatically from whoever heads their department — that
--- matters, because a staff member with no HOD has nobody who can verify their
--- monthly record.
+-- Without this the script would silently write nothing at all: the loop below
+-- joins on profiles, so a missing roster simply yields no rows, and you would
+-- be left looking at an empty Training page with no error to explain it.
 -- ---------------------------------------------------------------------------
 
-do $roster$
+do $guard$
 declare
-  person record;
-  v_auth_id uuid;
-  v_department_id integer;
-  v_hod_id integer;
-  v_profile_id integer;
-  v_created int := 0;
-  v_present int := 0;
+  v_missing text;
 begin
-  for person in
-    select * from (values
-      ('Hariz Haiqal', 'harizhaiqal@irs.com.my', 'Software Developer',  'R&D',              date '2026-01-01'),
-      ('Amyra',        'amyra@irs.com.my',       'Software Developer',  'R&D',              date '2026-01-01'),
-      ('Yu Shen Fei',  'fish@irs.com.my',        'Software Developer',  'R&D',              date '2026-01-01'),
-      ('Steve',        'steve@irs.com.my',       'Quality Assurance',   'R&D',              date '2026-01-01'),
-      ('Isman',        'isman@irs.com.my',       'Customer Support',    'Support',          date '2026-01-01'),
-      ('Akmal',        'akmal@irs.com.my',       'Customer Support',    'Support',          date '2026-01-01'),
-      ('Soo Peng',     'soopeng@irs.com.my',     'Sales Executive',     'Sales',            date '2026-01-01'),
-      ('Jeff',         'jeff@irs.com.my',        'Sales Executive',     'Sales',            date '2026-01-01'),
-      ('Ina',          'ina@irs.com.my',         'Admin Executive',     'Admin',            date '2026-01-01'),
-      ('Yi Ting',      'yiting@irs.com.my',      'Finance Executive',   'Finance',          date '2026-01-01'),
-      ('Lui',          'lui@irs.com.my',         'Support Engineer',    'Support Engineer', date '2026-01-01'),
-      ('Qiao Hui',     'qiaohui@irs.com.my',     'HR Executive',        'HR',               date '2026-01-01')
-    ) as t (full_name, email, designation, department, date_joined)
-  loop
-    -- Existing profiles are left untouched so this roster is safe to rerun.
-    if exists (
-      select 1 from public.profiles p where lower(p.email) = lower(person.email)
-    ) then
-      v_present := v_present + 1;
-      continue;
-    end if;
+  select string_agg(t.email, ', ' order by t.email) into v_missing
+    from (values
+      ('harizhaiqal@irs.com.my'), ('amyra@irs.com.my'), ('fish@irs.com.my'),
+      ('steve@irs.com.my'), ('isman@irs.com.my'), ('akmal@irs.com.my'),
+      ('soopeng@irs.com.my'), ('jeff@irs.com.my'), ('ina@irs.com.my'),
+      ('yiting@irs.com.my'), ('lui@irs.com.my'), ('qiaohui@irs.com.my')
+    ) as t (email)
+   where not exists (
+     select 1 from public.profiles p where lower(p.email) = t.email
+   );
 
-    v_auth_id := gen_random_uuid();
-    v_department_id := null;
-    v_hod_id := null;
-    v_profile_id := null;
-
-    select d.id, d.hod_id
-      into v_department_id, v_hod_id
-      from public.departments d
-     where lower(d.name) = lower(btrim(person.department));
-
-    if v_department_id is null then
-      raise exception 'No department named % for %', person.department, person.email
-        using hint = 'Check the names in public.departments before running this roster.';
-    end if;
-
-    -- A matching Auth account without a profile indicates a partial account.
-    -- Stop instead of silently linking or overwriting credentials.
-    if exists (
-      select 1 from auth.users u where lower(u.email) = lower(person.email)
-    ) then
-      raise exception 'An Auth account already exists for %, but its profile is missing', person.email
-        using hint = 'Repair or remove that partial account, then rerun this file.';
-    end if;
-
-    insert into auth.users (
-      instance_id, id, aud, role, email, encrypted_password,
-      email_confirmed_at, created_at, updated_at,
-      confirmation_token, email_change, email_change_token_new, recovery_token,
-      raw_app_meta_data, raw_user_meta_data
-    ) values (
-      '00000000-0000-0000-0000-000000000000', v_auth_id,
-      'authenticated', 'authenticated', lower(btrim(person.email)),
-      extensions.crypt('Password123!', extensions.gen_salt('bf')),
-      now(), now(), now(),
-      '', '', '', '',
-      '{"provider":"email","providers":["email"]}'::jsonb,
-      jsonb_build_object('full_name', btrim(person.full_name))
-    );
-
-    insert into auth.identities (
-      id, user_id, identity_data, provider, provider_id,
-      last_sign_in_at, created_at, updated_at
-    ) values (
-      gen_random_uuid(), v_auth_id,
-      jsonb_build_object(
-        'sub', v_auth_id::text,
-        'email', lower(btrim(person.email))
-      ),
-      'email', v_auth_id::text,
-      null, now(), now()
-    );
-
-    insert into public.profiles (
-      auth_user_id, full_name, email, designation, date_joined,
-      role, department_id, hod_id, is_active
-    ) values (
-      v_auth_id,
-      btrim(person.full_name),
-      lower(btrim(person.email)),
-      nullif(btrim(person.designation), ''),
-      person.date_joined,
-      'staff'::public.user_role,
-      v_department_id,
-      v_hod_id,
-      true
-    )
-    returning id into v_profile_id;
-
-    insert into public.automation_logs (
-      action_type, description, related_table, related_id, performed_by, is_system
-    ) values (
-      'profile.created',
-      format('%s (%s) added as staff', btrim(person.full_name), lower(btrim(person.email))),
-      'profiles', v_profile_id, null, true
-    );
-
-    v_created := v_created + 1;
-  end loop;
-
-  raise notice 'Roster: % added, % already present.', v_created, v_present;
+  if v_missing is not null then
+    raise exception 'These people do not exist yet: %', v_missing
+      using hint = 'Run: npm run user:roster';
+  end if;
 end
-$roster$;
+$guard$;
 
 -- ---------------------------------------------------------------------------
--- 2. Their training records, January to August 2026
+-- 1. Their training records, January to August 2026
 --
 -- The pattern column is deliberately uneven — one character per month, January
 -- on the left through August on the right:

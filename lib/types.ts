@@ -21,6 +21,7 @@ export type RequestComment = Tables<"request_comments">;
 export type ReminderSchedule = Tables<"reminder_schedules">;
 export type ReminderRun = Tables<"reminder_runs">;
 export type ReminderDelivery = Tables<"reminder_deliveries">;
+export type AiMediaAsset = Tables<"ai_media_assets">;
 
 // ---------------------------------------------------------------------------
 // Commission Records prototype

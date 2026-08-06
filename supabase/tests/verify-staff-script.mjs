@@ -87,7 +87,10 @@ await db.exec(`
     select 'salt';
   $$;
 
-  create table storage.buckets (id text primary key, name text, public boolean);
+  create table storage.buckets (
+    id text primary key, name text, public boolean,
+    file_size_limit bigint, allowed_mime_types text[]
+  );
   create table storage.objects (
     id uuid primary key default gen_random_uuid(),
     bucket_id text, name text, owner uuid
@@ -112,6 +115,74 @@ const baseline = await db.query(`
 console.log(`  applied — ${baseline.rows[0].profiles} profiles before the roster`);
 
 const script = strip(read("supabase/add-staff-and-training.sql"));
+
+// The script's own guard: with nobody created yet, it must stop and say so.
+// Without it the loop joins on profiles, finds nothing, writes nothing, and
+// reports success — leaving an empty Training page and no error to explain it.
+console.log("\n=== The guard fires when the people are missing ===");
+{
+  checks += 1;
+  try {
+    await db.exec(script);
+    failures += 1;
+    console.log("  FAIL  it ran anyway with nobody created");
+  } catch (error) {
+    const named = /do not exist yet/i.test(error.message);
+    if (named) console.log("  PASS  it stops and names who is missing");
+    else {
+      failures += 1;
+      console.log(`  FAIL  wrong error: ${error.message}`);
+    }
+  }
+}
+
+// Create the twelve the way scripts/create-user.mjs does through the Admin API:
+// an auth.users row, the auth.identities row email sign-in resolves through,
+// and the profile. Done here directly because PGlite has no GoTrue to call.
+console.log("\n=== Create the people (as the Admin API would) ===");
+for (const [email, fullName, department] of ROSTER) {
+  await db.query(
+    `
+    with new_account as (
+      select gen_random_uuid() as auth_id
+    ), auth_row as (
+      insert into auth.users (
+        instance_id, id, aud, role, email, encrypted_password,
+        email_confirmed_at, created_at, updated_at,
+        confirmation_token, email_change, email_change_token_new, recovery_token,
+        raw_app_meta_data, raw_user_meta_data
+      )
+      select '00000000-0000-0000-0000-000000000000'::uuid, n.auth_id,
+             'authenticated', 'authenticated', $1, 'hashed',
+             now(), now(), now(), '', '', '', '',
+             '{"provider":"email","providers":["email"]}'::jsonb,
+             jsonb_build_object('full_name', $2::text)
+        from new_account n
+      returning id
+    ), identity_row as (
+      insert into auth.identities (
+        id, user_id, identity_data, provider, provider_id,
+        last_sign_in_at, created_at, updated_at
+      )
+      select gen_random_uuid(), a.id,
+             jsonb_build_object('sub', a.id::text, 'email', $1::text),
+             'email', a.id::text, null, now(), now()
+        from auth_row a
+      returning user_id
+    )
+    insert into public.profiles (
+      auth_user_id, full_name, email, designation, date_joined,
+      role, department_id, hod_id, is_active
+    )
+    select i.user_id, $2, $1, 'Staff', date '2026-01-01', 'staff',
+           d.id, d.hod_id, true
+      from identity_row i
+      left join public.departments d on lower(d.name) = lower($3)
+  `,
+    [email, fullName, department],
+  );
+}
+console.log("  12 accounts created");
 
 console.log("\n=== Run the roster script ===");
 try {

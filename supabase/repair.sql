@@ -1210,3 +1210,88 @@ $$;
 revoke execute on function public.create_user(
   text, text, public.user_role, text, text, date, text, text
 ) from public;
+
+alter table public.ai_media_assets enable row level security;
+
+grant select, insert, update, delete on public.ai_media_assets to authenticated;
+
+grant usage, select on sequence public.ai_media_assets_id_seq to authenticated;
+
+drop policy if exists ai_media_assets_select on public.ai_media_assets;
+
+create policy ai_media_assets_select on public.ai_media_assets
+  for select to authenticated
+  using (true);
+
+drop policy if exists ai_media_assets_insert on public.ai_media_assets;
+
+create policy ai_media_assets_insert on public.ai_media_assets
+  for insert to authenticated
+  with check (uploader_id = public.current_user_id());
+
+drop policy if exists ai_media_assets_update on public.ai_media_assets;
+
+create policy ai_media_assets_update on public.ai_media_assets
+  for update to authenticated
+  using (
+    uploader_id = public.current_user_id()
+    or public.is_hr_admin()
+  )
+  with check (
+    uploader_id = public.current_user_id()
+    or public.is_hr_admin()
+  );
+
+drop policy if exists ai_media_assets_delete on public.ai_media_assets;
+
+create policy ai_media_assets_delete on public.ai_media_assets
+  for delete to authenticated
+  using (
+    uploader_id = public.current_user_id()
+    or public.is_hr_admin()
+  );
+
+-- The dashboard may already have created this bucket. ON CONFLICT keeps the
+-- migration safe while ensuring the bucket remains private.
+insert into storage.buckets (
+  id, name, public, file_size_limit, allowed_mime_types
+)
+values (
+  'AI videos',
+  'AI videos',
+  false,
+  52428800,
+  array['video/mp4', 'video/webm', 'video/quicktime']::text[]
+)
+on conflict (id) do update
+  set name = excluded.name,
+      public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists ai_videos_storage_select on storage.objects;
+
+create policy ai_videos_storage_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'AI videos');
+
+drop policy if exists ai_videos_storage_insert on storage.objects;
+
+create policy ai_videos_storage_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'AI videos'
+    and public.storage_path_owner(name) = public.current_user_id()
+  );
+
+drop policy if exists ai_videos_storage_delete on storage.objects;
+
+create policy ai_videos_storage_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'AI videos'
+    and (
+      public.storage_path_owner(name) = public.current_user_id()
+      or public.is_hr_admin()
+    )
+  );

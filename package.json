@@ -16,6 +16,9 @@
     "sql:repair": "node scripts/build-repair-sql.mjs",
     "test:repair": "node supabase/tests/verify-repair.mjs",
     "test:staff": "node supabase/tests/verify-staff-script.mjs",
+    "user:add": "node --env-file=.env.local scripts/create-user.mjs",
+    "user:roster": "node --env-file=.env.local scripts/create-user.mjs --roster",
+    "user:add-resend-hr": "node --env-file=.env.local scripts/create-user.mjs \"HR Admin 2\" harizzhaiqal96@gmail.com --role hr_admin --department HR",
     "sample:export": "tsx scripts/sample-export.ts"
   },
   "dependencies": {
@@ -43,6 +46,7 @@
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "tus-js-client": "^4.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

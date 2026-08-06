@@ -56,7 +56,10 @@ await db.exec(`
     select $1 || $2; $fn$;
   create function extensions.gen_salt(text) returns text language sql as $fn$
     select 'salt'; $fn$;
-  create table storage.buckets (id text primary key, name text, public boolean);
+  create table storage.buckets (
+    id text primary key, name text, public boolean,
+    file_size_limit bigint, allowed_mime_types text[]
+  );
   create table storage.objects (
     id uuid primary key default gen_random_uuid(),
     bucket_id text, name text, owner uuid
@@ -72,6 +75,8 @@ console.log("\n=== Build a healthy database ===");
 await db.exec(strip(read("supabase/migrations/20260728090000_initial_schema.sql")));
 await db.exec(strip(read("supabase/migrations/20260728090100_rls_policies.sql")));
 await db.exec(strip(read("supabase/migrations/20260730120000_requests.sql")));
+await db.exec(strip(read("supabase/migrations/20260806000000_ai_media_library.sql")));
+await db.exec(strip(read("supabase/migrations/20260806010000_ai_media_upload_limits.sql")));
 await db.exec(strip(read("supabase/seed.sql")));
 console.log("  migrations and seed applied");
 
@@ -212,7 +217,9 @@ console.log("\n=== repair.sql covers the migrations ===");
     read("supabase/migrations/20260728090000_initial_schema.sql") +
     read("supabase/migrations/20260728090100_rls_policies.sql") +
     read("supabase/migrations/20260730120000_requests.sql") +
-    read("supabase/migrations/20260804000000_create_user.sql");
+    read("supabase/migrations/20260804000000_create_user.sql") +
+    read("supabase/migrations/20260806000000_ai_media_library.sql") +
+    read("supabase/migrations/20260806010000_ai_media_upload_limits.sql");
   const repair = read("supabase/repair.sql");
 
   const count = (text, pattern) => (text.match(pattern) ?? []).length;

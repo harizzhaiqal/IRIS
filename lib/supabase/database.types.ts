@@ -102,6 +102,56 @@ export type Database = {
           },
         ];
       };
+      ai_media_assets: {
+        Row: {
+          id: number;
+          uploader_id: number;
+          title: string;
+          category: string;
+          description: string | null;
+          ai_tags: string[];
+          file_name: string;
+          storage_path: string;
+          mime_type: string;
+          file_size_bytes: number;
+          created_time: string;
+        };
+        Insert: {
+          id?: never;
+          uploader_id: number;
+          title: string;
+          category: string;
+          description?: string | null;
+          ai_tags?: string[];
+          file_name: string;
+          storage_path: string;
+          mime_type: string;
+          file_size_bytes: number;
+          created_time?: string;
+        };
+        Update: {
+          id?: never;
+          uploader_id?: number;
+          title?: string;
+          category?: string;
+          description?: string | null;
+          ai_tags?: string[];
+          file_name?: string;
+          storage_path?: string;
+          mime_type?: string;
+          file_size_bytes?: number;
+          created_time?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_media_assets_uploader_id_fkey";
+            columns: ["uploader_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       departments: {
         Row: {
           id: number;

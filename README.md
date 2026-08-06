@@ -288,6 +288,31 @@ Paste [`supabase/migrations/20260730120000_requests.sql`](supabase/migrations/20
 into the SQL Editor. Your existing training data is untouched. Use `setup.sql`
 only if you also want the demo requests, and remember it rebuilds everything.
 
+## Media Library
+
+All authenticated staff can upload AI-generated videos, preview them in the app,
+and download the original file. Video bytes are private in the Supabase Storage
+bucket named **`AI videos`**; searchable titles, categories, tags, and uploader
+details are stored in `public.ai_media_assets`.
+
+Uploads accept **MP4, WebM, and MOV** files up to **50 MB**. The browser uses the
+Supabase TUS endpoint in required 6 MB chunks, reports live progress, retries
+temporary connection failures, and can resume an interrupted upload when the same
+file is selected again. The bucket and metadata table enforce the same format and
+size restrictions.
+
+### Add Media Library to an existing database
+
+Apply [`supabase/migrations/20260806000000_ai_media_library.sql`](supabase/migrations/20260806000000_ai_media_library.sql)
+in the Supabase SQL Editor to create the metadata table, private bucket settings,
+and access policies. If that migration was already applied before upload limits
+were added, apply
+[`supabase/migrations/20260806010000_ai_media_upload_limits.sql`](supabase/migrations/20260806010000_ai_media_upload_limits.sql)
+as well. These migrations do not remove existing videos or records.
+
+The Supabase project-wide Storage limit must be at least 50 MB. Free projects allow
+up to 50 MB; on a paid plan, both the app constant and bucket limit can be raised.
+
 ## Monthly email reminders
 
 The **Reminders** menu is available only to `hr_admin`. HR can create schedules,
@@ -326,6 +351,19 @@ existing training or request data.
    checks for due work every 15 minutes; the schedule itself remains in Malaysia
    time.
 6. Sign in as HR, open **Reminders**, send a test, then enable the schedule.
+
+To create the HR administrator that receives a real test message at
+`harizzhaiqal96@gmail.com`, make sure `.env.local` contains the server-only
+`SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`), then run:
+
+```bash
+npm run user:add-resend-hr
+```
+
+The script uses Supabase Auth's Admin API, creates the matching HR profile, and
+prints a generated temporary password. Copy it, sign in with that Gmail address,
+then use **Send test to me**. Do not put the secret/service-role key in a
+`NEXT_PUBLIC_` variable or paste it into browser code.
 
 Resend accepting a request is recorded as **Accepted**. Confirmed failures may be
 queued again with **Retry failed only**. Ambiguous interrupted responses are kept
