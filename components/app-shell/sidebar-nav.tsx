@@ -8,6 +8,7 @@ import {
   Inbox,
   LayoutDashboard,
   LibraryBig,
+  ListChecks,
   NotebookPen,
   ReceiptText,
   Users,
@@ -56,6 +57,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Training",
     icon: NotebookPen,
     roles: ["hr_admin", "ceo"],
+  },
+  {
+    href: "/training/approvals",
+    label: "Training Submission",
+    icon: ListChecks,
+    roles: ["hr_admin"],
   },
   {
     href: "/requests",

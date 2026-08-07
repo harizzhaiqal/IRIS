@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   FileDown,
@@ -52,7 +52,7 @@ export type StaffTrainingDirectoryRow = {
   totalMinutes: number;
   detailHref: string;
   exportHref: string;
-  verifyHref?: string | null;
+  reviewHref?: string | null;
 };
 
 export function StaffTrainingDirectory({
@@ -61,16 +61,17 @@ export function StaffTrainingDirectory({
   year,
   years,
   bulkExportHref,
-  showVerifyAction = false,
+  reviewAction,
 }: {
   rows: StaffTrainingDirectoryRow[];
   departments: { id: number; name: string }[];
   year: number;
   years: number[];
   bulkExportHref?: string;
-  showVerifyAction?: boolean;
+  reviewAction?: "verify" | "approve";
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState(ALL_DEPARTMENTS);
@@ -99,7 +100,7 @@ export function StaffTrainingDirectory({
   function changeYear(value: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("year", value);
-    router.push(`/training/submissions?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`);
   }
 
   function clearFilters() {
@@ -229,12 +230,12 @@ export function StaffTrainingDirectory({
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-center gap-2">
-                      {showVerifyAction ? (
-                        row.verifyHref ? (
+                      {reviewAction ? (
+                        row.reviewHref ? (
                           <Button variant="success" size="sm" asChild>
-                            <Link href={row.verifyHref}>
+                            <Link href={row.reviewHref}>
                               <CheckCircle2 className="h-4 w-4" />
-                              Verify
+                              {reviewAction === "approve" ? "Approve" : "Verify"}
                             </Link>
                           </Button>
                         ) : (
@@ -242,10 +243,14 @@ export function StaffTrainingDirectory({
                             variant="success"
                             size="sm"
                             disabled
-                            title="No submissions are awaiting your verification."
+                            title={
+                              reviewAction === "approve"
+                                ? "No submissions are awaiting HR approval."
+                                : "No submissions are awaiting your verification."
+                            }
                           >
                             <CheckCircle2 className="h-4 w-4" />
-                            Verify
+                            {reviewAction === "approve" ? "Approve" : "Verify"}
                           </Button>
                         )
                       ) : null}
@@ -260,10 +265,10 @@ export function StaffTrainingDirectory({
                         </Link>
                       </Button>
                       <Button
-                        variant={showVerifyAction ? "default" : "success"}
+                        variant={reviewAction ? "default" : "success"}
                         size="sm"
                         className={
-                          showVerifyAction
+                          reviewAction
                             ? "bg-violet-600 text-white hover:bg-violet-700"
                             : undefined
                         }

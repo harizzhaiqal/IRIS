@@ -55,11 +55,17 @@ export default async function ReviewSubmissionPage({
   const backHref =
     profile.role === "hod"
       ? "/training/team"
+      : profile.role === "hr_admin"
+        ? "/training/approvals"
       : employee
         ? `/training/staff/${employee.id}?month=${submission.month}&year=${submission.year}`
         : "/training/submissions";
   const backLabel =
-    profile.role === "hod" ? "Back to team submissions" : "Back to employee training";
+    profile.role === "hod"
+      ? "Back to team submissions"
+      : profile.role === "hr_admin"
+        ? "Back to training submissions"
+        : "Back to employee training";
 
   return (
     <div className="space-y-6">

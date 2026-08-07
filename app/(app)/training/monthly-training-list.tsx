@@ -2,7 +2,12 @@
 
 import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  UserRoundSearch,
+} from "lucide-react";
 
 import { EntriesTable } from "@/components/training/entries-table";
 import { StatusBadge } from "@/components/training/status-badge";
@@ -101,6 +106,9 @@ export function MonthlyTrainingList({
           const expanded = expandedIds.has(group.id);
           const count = group.records.length;
           const panelId = `training-month-${group.id}`;
+          const actionLabel = group.actionLabel ?? "View";
+          const isViewAction = actionLabel === "View";
+          const isVerifyAction = actionLabel === "Verify";
 
           return (
             <Fragment key={group.id}>
@@ -146,9 +154,23 @@ export function MonthlyTrainingList({
                   <TableCell className="text-right">
                     {group.actionHref ? (
                       <span onClick={(event) => event.stopPropagation()}>
-                        <Button variant="outline" size="sm" asChild>
+                        <Button
+                          variant={isVerifyAction ? "success" : isViewAction ? "default" : "outline"}
+                          size="sm"
+                          className={
+                            isViewAction
+                              ? "bg-blue-600 text-white hover:bg-blue-700"
+                              : undefined
+                          }
+                          asChild
+                        >
                           <Link href={group.actionHref}>
-                            {group.actionLabel ?? "View"}
+                            {isVerifyAction ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : isViewAction ? (
+                              <UserRoundSearch className="h-4 w-4" />
+                            ) : null}
+                            {actionLabel}
                           </Link>
                         </Button>
                       </span>

@@ -1,6 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import { listDepartments } from "@/lib/queries/departments";
-import { listTeamMembers } from "@/lib/queries/profiles";
+import { listActiveEmployees } from "@/lib/queries/profiles";
 import { listEmployeeYearTrainingSummaries } from "@/lib/queries/submissions";
 import { filesOwnRecords } from "@/lib/types";
 import {
@@ -17,24 +17,25 @@ function resolveYear(value?: string) {
     : new Date().getFullYear();
 }
 
-export default async function TeamTrainingPage({
+export default async function HrTrainingApprovalsPage({
   searchParams,
 }: {
   searchParams: { year?: string };
 }) {
-  const profile = await requireRole(["hod"]);
+  await requireRole(["hr_admin"]);
+
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = resolveYear(searchParams.year);
-  const [allTeamMembers, departments] = await Promise.all([
-    listTeamMembers(profile.id),
+  const [allEmployees, departments] = await Promise.all([
+    listActiveEmployees(),
     listDepartments(),
   ]);
-  const team = allTeamMembers.filter((member) =>
-    filesOwnRecords(member.role),
+  const employees = allEmployees.filter((employee) =>
+    filesOwnRecords(employee.role),
   );
   const summaries = await listEmployeeYearTrainingSummaries(
-    team.map((member) => member.id),
+    employees.map((employee) => employee.id),
     year,
   );
   const departmentNames = new Map(
@@ -52,45 +53,37 @@ export default async function TeamTrainingPage({
     totals.set(summary.employee_id, current);
   }
 
-  const rows: StaffTrainingDirectoryRow[] = team.map((member) => {
-    const employeeTotals = totals.get(member.id) ?? {
+  const rows: StaffTrainingDirectoryRow[] = employees.map((employee) => {
+    const employeeTotals = totals.get(employee.id) ?? {
       trainingCount: 0,
       minutes: 0,
     };
-    const nextVerification = summaries
+    const nextApproval = summaries
       .filter(
         (summary) =>
-          summary.employee_id === member.id &&
-          summary.status === "submitted_pending_hod",
+          summary.employee_id === employee.id &&
+          summary.status === "hod_verified",
       )
       .sort((left, right) => left.month - right.month)[0];
 
     return {
-      id: member.id,
-      fullName: member.full_name,
-      email: member.email,
-      designation: member.designation,
-      departmentId: member.department_id,
-      departmentName: member.department_id
-        ? departmentNames.get(member.department_id) ?? null
+      id: employee.id,
+      fullName: employee.full_name,
+      email: employee.email,
+      designation: employee.designation,
+      departmentId: employee.department_id,
+      departmentName: employee.department_id
+        ? departmentNames.get(employee.department_id) ?? null
         : null,
       trainingCount: employeeTotals.trainingCount,
       totalMinutes: employeeTotals.minutes,
-      reviewHref: nextVerification
-        ? `/training/review/${nextVerification.id}`
+      reviewHref: nextApproval
+        ? `/training/review/${nextApproval.id}`
         : null,
-      detailHref: `/training/staff/${member.id}?month=${month}&year=${year}`,
-      exportHref: `/training/export?employeeId=${member.id}&year=${year}`,
+      detailHref: `/training/staff/${employee.id}?month=${month}&year=${year}`,
+      exportHref: `/training/export?employeeId=${employee.id}&year=${year}`,
     };
   });
-  const teamDepartmentIds = new Set(
-    team
-      .map((member) => member.department_id)
-      .filter((id): id is number => id !== null),
-  );
-  const teamDepartments = departments.filter((department) =>
-    teamDepartmentIds.has(department.id),
-  );
   const currentYear = now.getFullYear();
   const years = Array.from(
     new Set([year, currentYear - 2, currentYear - 1, currentYear, currentYear + 1]),
@@ -103,16 +96,16 @@ export default async function TeamTrainingPage({
           Training submissions
         </h1>
         <p className="text-sm text-muted-foreground">
-          Review team training, view yearly records, and download reports.
+          Review company training submissions and give final HR approval.
         </p>
       </div>
 
       <StaffTrainingDirectory
         rows={rows}
-        departments={teamDepartments}
+        departments={departments}
         year={year}
         years={years}
-        reviewAction="verify"
+        reviewAction="approve"
       />
     </div>
   );
