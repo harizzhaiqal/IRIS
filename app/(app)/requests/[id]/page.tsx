@@ -34,7 +34,6 @@ type StoredSuggestion = {
   category?: RequestCategory;
   department?: string;
   priority?: RequestPriority;
-  approvalRequired?: boolean;
   reason?: string;
 };
 
@@ -95,10 +94,6 @@ export default async function RequestDetailPage({
         suggestion.priority && suggestion.priority !== request.priority
           ? `priority to ${REQUEST_PRIORITY_LABELS[request.priority]}`
           : null,
-        suggestion.approvalRequired !== undefined &&
-        suggestion.approvalRequired !== request.approval_required
-          ? `approval to ${request.approval_required ? "required" : "not required"}`
-          : null,
       ].filter(Boolean)
     : [];
 
@@ -157,9 +152,6 @@ export default async function RequestDetailPage({
             <Field label="Department">
               {request.assigned_department ?? "Not assigned"}
             </Field>
-            <Field label="Approval">
-              {request.approval_required ? "Required" : "Not required"}
-            </Field>
             <Field label="Attachment">
               {request.attachment_name ? (
                 <span className="inline-flex items-center gap-1.5">
@@ -183,7 +175,7 @@ export default async function RequestDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <dl className="grid gap-4 sm:grid-cols-3">
               <Field label="Category">
                 {suggestion.category
                   ? REQUEST_CATEGORY_LABELS[suggestion.category]
@@ -194,13 +186,6 @@ export default async function RequestDetailPage({
                 {suggestion.priority
                   ? REQUEST_PRIORITY_LABELS[suggestion.priority]
                   : "—"}
-              </Field>
-              <Field label="Approval required">
-                {suggestion.approvalRequired === undefined
-                  ? "—"
-                  : suggestion.approvalRequired
-                    ? "Yes"
-                    : "No"}
               </Field>
             </dl>
 
@@ -240,7 +225,7 @@ export default async function RequestDetailPage({
       {isReviewer ? (
         <Card>
           <CardHeader>
-            <CardTitle>Review</CardTitle>
+            <CardTitle>Request handling</CardTitle>
           </CardHeader>
           <CardContent>
             <ReviewPanel

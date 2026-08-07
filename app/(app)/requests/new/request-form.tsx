@@ -9,7 +9,6 @@ import { Loader2, Paperclip, Sparkles, Upload, X } from "lucide-react";
 import { useGlobalPending } from "@/components/app-shell/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -64,7 +63,6 @@ export function RequestForm({ userId }: { userId: number }) {
       estimatedCost: "",
       priority: "normal",
       assignedDepartment: "",
-      approvalRequired: true,
     },
   });
 
@@ -92,7 +90,6 @@ export function RequestForm({ userId }: { userId: number }) {
     setValue("category", result.data.category, { shouldValidate: true });
     setValue("priority", result.data.priority, { shouldValidate: true });
     setValue("assignedDepartment", result.data.department, { shouldValidate: true });
-    setValue("approvalRequired", result.data.approvalRequired);
   }
 
   async function uploadAttachment(): Promise<
@@ -138,7 +135,6 @@ export function RequestForm({ userId }: { userId: number }) {
       estimatedCostCents: parseCostToCents(values.estimatedCost) ?? 0,
       priority: values.priority,
       assignedDepartment: values.assignedDepartment || null,
-      approvalRequired: values.approvalRequired,
       attachmentPath: uploaded?.path ?? null,
       attachmentName: uploaded?.name ?? null,
       aiSuggestion: suggestion,
@@ -151,7 +147,7 @@ export function RequestForm({ userId }: { userId: number }) {
       return;
     }
 
-    router.push(`/requests/${result.data.requestId}`);
+    router.push("/requests");
     router.refresh();
   }
 
@@ -215,7 +211,7 @@ export function RequestForm({ userId }: { userId: number }) {
                 <Sparkles className="h-4 w-4 text-primary" />
                 <p className="text-sm font-medium">Suggestion applied</p>
               </div>
-              <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+              <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
                 <div className="flex gap-2">
                   <dt className="text-muted-foreground">Category</dt>
                   <dd>{REQUEST_CATEGORY_LABELS[suggestion.category]}</dd>
@@ -227,10 +223,6 @@ export function RequestForm({ userId }: { userId: number }) {
                 <div className="flex gap-2">
                   <dt className="text-muted-foreground">Priority</dt>
                   <dd>{REQUEST_PRIORITY_LABELS[suggestion.priority]}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="text-muted-foreground">Approval required</dt>
-                  <dd>{suggestion.approvalRequired ? "Yes" : "No"}</dd>
                 </div>
               </dl>
               <p className="mt-3 text-sm text-muted-foreground">
@@ -314,29 +306,6 @@ export function RequestForm({ userId }: { userId: number }) {
               />
               <p className="text-xs text-muted-foreground">
                 The team that will handle this.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 rounded-md border p-3">
-            <Controller
-              control={control}
-              name="approvalRequired"
-              render={({ field }) => (
-                <Checkbox
-                  id="approvalRequired"
-                  checked={field.value}
-                  onCheckedChange={(checked) => field.onChange(checked === true)}
-                />
-              )}
-            />
-            <div className="space-y-1">
-              <Label htmlFor="approvalRequired" className="font-medium">
-                Approval required
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Requests needing approval wait for a manager or admin. Anything
-                else goes straight to the handling team.
               </p>
             </div>
           </div>

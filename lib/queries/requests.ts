@@ -29,7 +29,7 @@ const LIST_SELECT = `
   *,
   requester:profiles!requests_requester_id_fkey (
     id, full_name,
-    department:departments ( name )
+    department:departments!profiles_department_id_fkey ( name )
   )
 `;
 
@@ -37,7 +37,7 @@ const DETAIL_SELECT = `
   *,
   requester:profiles!requests_requester_id_fkey (
     id, full_name,
-    department:departments ( name )
+    department:departments!profiles_department_id_fkey ( name )
   ),
   reviewer:profiles!requests_reviewed_by_fkey ( id, full_name ),
   comments:request_comments (

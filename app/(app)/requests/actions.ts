@@ -8,7 +8,6 @@ import { requireProfile } from "@/lib/auth";
 import { logAction } from "@/lib/automationLog";
 import { createClient } from "@/lib/supabase/server";
 import {
-  filesOwnRecords,
   isReadOnlyRole,
   type RequestStatus,
 } from "@/lib/types";
@@ -53,10 +52,11 @@ export async function createRequest(
 ): Promise<ActionResult<{ requestId: number }>> {
   const profile = await requireProfile();
 
-  // HR and the CEO review requests rather than raising them, so this is a
-  // wider gate than the read-only one used by the decision actions below.
-  if (!filesOwnRecords(profile.role)) {
-    return failed("This account reviews requests rather than raising them.");
+  // Every active role except the read-only CEO may raise a request. Requests
+  // are saved directly to the handling queue and do not enter an approval
+  // stage.
+  if (isReadOnlyRole(profile.role)) {
+    return failed("Your account has view-only access.");
   }
 
   const parsed = createRequestSchema.safeParse(input);
@@ -66,12 +66,6 @@ export async function createRequest(
 
   const entry = parsed.data;
   const supabase = createClient();
-
-  // A request needing approval waits for one; anything else goes straight into
-  // the handling team's queue.
-  const status: RequestStatus = entry.approvalRequired
-    ? "pending_approval"
-    : "submitted";
 
   const { data: created, error } = await supabase
     .from("requests")
@@ -83,8 +77,8 @@ export async function createRequest(
       estimated_cost_cents: entry.estimatedCostCents,
       priority: entry.priority,
       assigned_department: entry.assignedDepartment,
-      approval_required: entry.approvalRequired,
-      status,
+      approval_required: false,
+      status: "submitted",
       attachment_path: entry.attachmentPath ?? null,
       attachment_name: entry.attachmentName ?? null,
       ai_suggestion: entry.aiSuggestion ?? null,
@@ -162,8 +156,8 @@ export async function decideRequest(input: unknown): Promise<ActionResult> {
   const nextStatus = DECISION_STATUS[decision];
 
   const allowed: Record<string, RequestStatus[]> = {
-    approve: ["submitted", "pending_approval"],
-    reject: ["submitted", "pending_approval"],
+    approve: ["pending_approval"],
+    reject: ["pending_approval"],
     start: ["submitted", "approved"],
     complete: ["approved", "in_progress"],
   };

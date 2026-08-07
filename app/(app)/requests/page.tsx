@@ -13,6 +13,7 @@ import { requireProfile } from "@/lib/auth";
 import { listRequestDepartments, listRequests } from "@/lib/queries/requests";
 import {
   filesOwnRecords,
+  isReadOnlyRole,
   REQUEST_CATEGORY_ORDER,
   REQUEST_PRIORITY_ORDER,
   REQUEST_STATUS_LABELS,
@@ -76,7 +77,8 @@ export default async function RequestsPage({
   // Reviewers see other people's names; staff only ever see their own, so the
   // requester column and filter would be a column of one repeated value.
   const isReviewer = profile.role !== "staff";
-  const canRaise = filesOwnRecords(profile.role);
+  const filesPersonalRecords = filesOwnRecords(profile.role);
+  const canRaise = !isReadOnlyRole(profile.role);
 
   const counts = REQUEST_STATUS_ORDER.map((key) => ({
     key,
@@ -121,7 +123,7 @@ export default async function RequestsPage({
           {/* Titled to match the menu, which names this differently depending
               on whether it is your own list or the company's. */}
           <h1 className="text-2xl font-semibold tracking-tight">
-            {canRaise ? "Requests" : "Request records"}
+            {filesPersonalRecords ? "Requests" : "Request records"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isReviewer

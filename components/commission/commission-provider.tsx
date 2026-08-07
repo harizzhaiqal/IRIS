@@ -69,6 +69,14 @@ function isStoredState(value: unknown): value is StoredCommissionState {
   );
 }
 
+function mergeSeededItems<T extends { id: number }>(
+  stored: T[],
+  seeded: T[],
+): T[] {
+  const storedIds = new Set(stored.map((item) => item.id));
+  return [...seeded.filter((item) => !storedIds.has(item.id)), ...stored];
+}
+
 export function CommissionProvider({
   viewer,
   children,
@@ -93,9 +101,15 @@ export function CommissionProvider({
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
         if (isStoredState(parsed)) {
-          setRecords(parsed.records);
-          setViewLogs(parsed.viewLogs);
-          setActivityLogs(parsed.activityLogs);
+          setRecords(
+            mergeSeededItems(parsed.records, INITIAL_COMMISSION_RECORDS),
+          );
+          setViewLogs(
+            mergeSeededItems(parsed.viewLogs, INITIAL_COMMISSION_VIEW_LOGS),
+          );
+          setActivityLogs(
+            mergeSeededItems(parsed.activityLogs, INITIAL_COMMISSION_ACTIVITY),
+          );
         }
       }
     } catch {

@@ -31,11 +31,64 @@ export const DEMO_COMMISSION_EMPLOYEES: CommissionEmployee[] = [
   { id: 103, name: "Farah Nabila", department: "Sales" },
   { id: 1, name: "Chng Kok Sheng", department: "R&D" },
   { id: 2, name: "Joshua", department: "Support" },
+  { id: 3, name: "Ms. Chen", department: "Finance" },
+  { id: 4, name: "Ms. Lee", department: "HR" },
   { id: 6, name: "Demo Staff (R&D)", department: "R&D" },
   { id: 7, name: "Demo Staff (Support)", department: "Support" },
 ];
 
 export const INITIAL_COMMISSION_RECORDS: CommissionRecord[] = [
+  {
+    id: 1011,
+    employeeId: 4,
+    employeeName: "Ms. Lee",
+    department: "HR",
+    commissionMonth: 7,
+    commissionYear: 2026,
+    pdfFileName: "Commission_Ms_Lee_July_2026.pdf",
+    uploadedBy: "Nurul Aina Binti Rahim",
+    uploadedAt: "2026-07-28T01:58:00.000Z",
+    emailSentAt: "2026-07-28T02:28:00.000Z",
+    viewedAt: "2026-07-28T07:54:00.000Z",
+    acknowledgedAt: "2026-07-28T08:02:00.000Z",
+    status: "Acknowledged",
+    reminderCount: 0,
+    createdAt: "2026-07-28T01:58:00.000Z",
+    updatedAt: "2026-07-28T08:02:00.000Z",
+  },
+  {
+    id: 1010,
+    employeeId: 3,
+    employeeName: "Ms. Chen",
+    department: "Finance",
+    commissionMonth: 7,
+    commissionYear: 2026,
+    pdfFileName: "Commission_Ms_Chen_July_2026.pdf",
+    uploadedBy: "Nurul Aina Binti Rahim",
+    uploadedAt: "2026-07-28T01:54:00.000Z",
+    emailSentAt: "2026-07-28T02:24:00.000Z",
+    viewedAt: "2026-07-28T06:46:00.000Z",
+    status: "Viewed",
+    reminderCount: 0,
+    createdAt: "2026-07-28T01:54:00.000Z",
+    updatedAt: "2026-07-28T06:46:00.000Z",
+  },
+  {
+    id: 1009,
+    employeeId: 1,
+    employeeName: "Chng Kok Sheng",
+    department: "R&D",
+    commissionMonth: 7,
+    commissionYear: 2026,
+    pdfFileName: "Commission_Chng_Kok_Sheng_July_2026.pdf",
+    uploadedBy: "Nurul Aina Binti Rahim",
+    uploadedAt: "2026-07-28T01:50:00.000Z",
+    emailSentAt: "2026-07-28T02:21:00.000Z",
+    status: "Email Sent",
+    reminderCount: 0,
+    createdAt: "2026-07-28T01:50:00.000Z",
+    updatedAt: "2026-07-28T02:21:00.000Z",
+  },
   {
     id: 1008,
     employeeId: 101,
@@ -175,6 +228,20 @@ export const INITIAL_COMMISSION_RECORDS: CommissionRecord[] = [
 
 export const INITIAL_COMMISSION_VIEW_LOGS: CommissionViewLog[] = [
   {
+    id: 505,
+    commissionRecordId: 1011,
+    employeeId: 4,
+    viewedAt: "2026-07-28T07:54:00.000Z",
+    action: "Commission PDF viewed",
+  },
+  {
+    id: 504,
+    commissionRecordId: 1010,
+    employeeId: 3,
+    viewedAt: "2026-07-28T06:46:00.000Z",
+    action: "Commission PDF viewed",
+  },
+  {
     id: 501,
     commissionRecordId: 1005,
     employeeId: 103,
@@ -198,6 +265,22 @@ export const INITIAL_COMMISSION_VIEW_LOGS: CommissionViewLog[] = [
 ];
 
 export const INITIAL_COMMISSION_ACTIVITY: CommissionActivityLog[] = [
+  {
+    id: 907,
+    commissionRecordId: 1011,
+    action: "Commission acknowledged",
+    description: "Ms. Lee acknowledged the July 2026 commission record.",
+    performedBy: "Ms. Lee",
+    createdAt: "2026-07-28T08:02:00.000Z",
+  },
+  {
+    id: 906,
+    commissionRecordId: 1010,
+    action: "Commission PDF viewed",
+    description: "Ms. Chen viewed the July 2026 commission PDF.",
+    performedBy: "Ms. Chen",
+    createdAt: "2026-07-28T06:46:00.000Z",
+  },
   {
     id: 905,
     commissionRecordId: 1007,

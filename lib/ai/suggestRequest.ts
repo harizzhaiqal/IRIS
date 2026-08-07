@@ -20,7 +20,6 @@ export type RequestSuggestion = {
   category: RequestCategory;
   department: string;
   priority: RequestPriority;
-  approvalRequired: boolean;
   reason: string;
 };
 
@@ -101,13 +100,6 @@ const DEPARTMENT_BY_CATEGORY: Record<RequestCategory, string> = {
   other: "Admin",
 };
 
-/**
- * Anything that spends money needs a manager or admin to agree first. Access
- * problems and building faults are services rather than purchases, so they go
- * straight to the team that handles them.
- */
-const APPROVAL_FREE_CATEGORIES: RequestCategory[] = ["access_card", "maintenance"];
-
 const PRIORITY_REASONS: Record<RequestPriority, string> = {
   urgent: "The wording suggests work is blocked, so this is raised as urgent.",
   high: "A repair or replacement, which is handled ahead of routine requests.",
@@ -147,17 +139,11 @@ export function suggestRequest(description: string): RequestSuggestion {
 
   const category = suggestCategory(text);
   const priority = suggestPriority(text);
-  const approvalRequired = !APPROVAL_FREE_CATEGORIES.includes(category);
-
-  const approvalReason = approvalRequired
-    ? "Equipment purchase usually requires manager or admin approval."
-    : "Handled directly by the responsible team, so no purchase approval is needed.";
 
   return {
     category,
     department: DEPARTMENT_BY_CATEGORY[category],
     priority,
-    approvalRequired,
-    reason: `${PRIORITY_REASONS[priority]} ${approvalReason}`,
+    reason: PRIORITY_REASONS[priority],
   };
 }

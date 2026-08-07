@@ -18,8 +18,8 @@ type Decision = "approve" | "reject" | "start" | "complete";
  * enforces the same set, and the database enforces it again.
  */
 const AVAILABLE: Record<Decision, RequestStatus[]> = {
-  approve: ["submitted", "pending_approval"],
-  reject: ["submitted", "pending_approval"],
+  approve: ["pending_approval"],
+  reject: ["pending_approval"],
   start: ["submitted", "approved"],
   complete: ["approved", "in_progress"],
 };
@@ -88,7 +88,7 @@ export function ReviewPanel({
           rows={3}
           value={comment}
           onChange={(event) => setComment(event.target.value)}
-          placeholder="Optional for approval, required when rejecting."
+          placeholder="Optional note for the request history."
         />
       </div>
 

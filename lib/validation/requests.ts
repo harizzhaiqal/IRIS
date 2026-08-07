@@ -42,7 +42,6 @@ export const requestFormSchema = z.object({
     .string()
     .trim()
     .max(80, "Keep the department under 80 characters"),
-  approvalRequired: z.boolean(),
 });
 
 export type RequestFormValues = z.infer<typeof requestFormSchema>;
@@ -55,7 +54,6 @@ export const createRequestSchema = z.object({
   estimatedCostCents: z.number().int().min(0).max(100_000_000),
   priority: z.enum(PRIORITIES),
   assignedDepartment: z.string().trim().max(80).nullable(),
-  approvalRequired: z.boolean(),
   attachmentPath: z.string().max(500).nullable().optional(),
   attachmentName: z.string().max(255).nullable().optional(),
   aiSuggestion: z
@@ -63,7 +61,6 @@ export const createRequestSchema = z.object({
       category: z.enum(CATEGORIES),
       department: z.string(),
       priority: z.enum(PRIORITIES),
-      approvalRequired: z.boolean(),
       reason: z.string(),
     })
     .nullable()

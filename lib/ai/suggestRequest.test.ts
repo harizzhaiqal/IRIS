@@ -11,8 +11,7 @@ describe("suggestRequest", () => {
     expect(result.category).toBe("it_equipment");
     expect(result.department).toBe("IT");
     expect(result.priority).toBe("normal");
-    expect(result.approvalRequired).toBe(true);
-    expect(result.reason).toContain("approval");
+    expect(result.reason).toContain("standard equipment");
   });
 
   describe("category", () => {
@@ -88,23 +87,6 @@ describe("suggestRequest", () => {
       expect(
         suggestRequest("Printer is down, cannot work, please repair").priority,
       ).toBe("urgent");
-    });
-  });
-
-  describe("approval", () => {
-    it("is required for anything that spends money", () => {
-      expect(suggestRequest("New monitor please").approvalRequired).toBe(true);
-      expect(suggestRequest("A new office chair").approvalRequired).toBe(true);
-      expect(suggestRequest("Install the licensed IDE").approvalRequired).toBe(true);
-    });
-
-    it("is not required for access and building faults", () => {
-      expect(suggestRequest("My access card is not working").approvalRequired).toBe(
-        false,
-      );
-      expect(suggestRequest("The aircond needs maintenance").approvalRequired).toBe(
-        false,
-      );
     });
   });
 

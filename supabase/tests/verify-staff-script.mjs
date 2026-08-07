@@ -485,5 +485,125 @@ console.log("\n=== Run it a second time ===");
     `${others.rows[0].n} vs ${baseline.rows[0].submissions} before`);
 }
 
+// ---------------------------------------------------------------------------
+// Removing one month again
+//
+// A delete is the one operation with no undo, so what it reaches has to be
+// exact: the named month and nothing either side of it, and no audit rows left
+// pointing at submissions that are gone.
+// ---------------------------------------------------------------------------
+console.log("\n=== Remove August 2026 for one person ===");
+{
+  const removal = strip(read("supabase/remove-training-month.sql"));
+  const TARGET = "harizhaiqal@irs.com.my";
+
+  const before = await db.query(
+    `
+    select
+      (select count(*)::int from public.training_submissions s
+        join public.profiles p on p.id = s.employee_id
+       where lower(p.email) = $1 and s.year = 2026) as months,
+      (select count(*)::int from public.training_submissions s
+        join public.profiles p on p.id = s.employee_id
+       where lower(p.email) = $1 and s.year = 2026 and s.month = 8) as august,
+      (select count(*)::int from public.training_submissions) as all_months,
+      (select count(*)::int from public.training_records) as all_records
+  `,
+    [TARGET],
+  );
+
+  check("the target has an August 2026 record to begin with",
+    before.rows[0].august === 1, `${before.rows[0].august}`);
+
+  // The audit rows that must go with it.
+  const logsBefore = await db.query(
+    `
+    select count(*)::int as n from public.automation_logs l
+     where l.related_table = 'training_submissions'
+       and l.related_id in (
+         select s.id from public.training_submissions s
+          join public.profiles p on p.id = s.employee_id
+         where lower(p.email) = $1 and s.year = 2026 and s.month = 8
+       )
+  `,
+    [TARGET],
+  );
+
+  await db.exec(removal);
+  console.log("  applied without error");
+
+  const after = await db.query(
+    `
+    select
+      (select count(*)::int from public.training_submissions s
+        join public.profiles p on p.id = s.employee_id
+       where lower(p.email) = $1 and s.year = 2026) as months,
+      (select count(*)::int from public.training_submissions s
+        join public.profiles p on p.id = s.employee_id
+       where lower(p.email) = $1 and s.year = 2026 and s.month = 8) as august,
+      (select count(*)::int from public.training_submissions) as all_months,
+      (select count(*)::int from public.training_records) as all_records
+  `,
+    [TARGET],
+  );
+
+  check("August 2026 is gone", after.rows[0].august === 0, `${after.rows[0].august}`);
+  check("their other 2026 months are untouched",
+    after.rows[0].months === before.rows[0].months - 1,
+    `${before.rows[0].months} -> ${after.rows[0].months}`);
+  check("exactly one submission was removed company-wide",
+    after.rows[0].all_months === before.rows[0].all_months - 1,
+    `${before.rows[0].all_months} -> ${after.rows[0].all_months}`);
+  check("nobody else lost an entry",
+    after.rows[0].all_records < before.rows[0].all_records,
+    `${before.rows[0].all_records} -> ${after.rows[0].all_records}`);
+
+  // The cascade has to reach the entries; orphans would keep counting toward
+  // totals through a submission that no longer exists.
+  const orphanRecords = await db.query(`
+    select count(*)::int as n from public.training_records r
+     where not exists (
+       select 1 from public.training_submissions s where s.id = r.submission_id
+     )
+  `);
+  check("no training entries were orphaned", orphanRecords.rows[0].n === 0,
+    `${orphanRecords.rows[0].n}`);
+
+  const orphanAttachments = await db.query(`
+    select count(*)::int as n from public.training_attachments a
+     where not exists (
+       select 1 from public.training_records r where r.id = a.training_record_id
+     )
+  `);
+  check("no attachment rows were orphaned", orphanAttachments.rows[0].n === 0,
+    `${orphanAttachments.rows[0].n}`);
+
+  // related_id is not a foreign key, so nothing cleans these up for us. The
+  // script has to, or the HR activity feed points at a month that is gone.
+  const staleLogs = await db.query(`
+    select count(*)::int as n from public.automation_logs l
+     where l.related_table = 'training_submissions'
+       and l.related_id is not null
+       and not exists (
+         select 1 from public.training_submissions s where s.id = l.related_id
+       )
+  `);
+  check("no audit rows left pointing at a deleted month",
+    staleLogs.rows[0].n === 0,
+    `${staleLogs.rows[0].n} stale, ${logsBefore.rows[0].n} expected removed`);
+
+  // Running it on a month that is already clear must be a no-op, not an error.
+  const beforeRepeat = await db.query(
+    `select count(*)::int as n from public.training_submissions`,
+  );
+  await db.exec(removal);
+  const afterRepeat = await db.query(
+    `select count(*)::int as n from public.training_submissions`,
+  );
+  check("running it again removes nothing and does not fail",
+    afterRepeat.rows[0].n === beforeRepeat.rows[0].n,
+    `${beforeRepeat.rows[0].n} -> ${afterRepeat.rows[0].n}`);
+}
+
 console.log(`\n${checks - failures}/${checks} checks passed`);
 process.exit(failures === 0 ? 0 : 1);
